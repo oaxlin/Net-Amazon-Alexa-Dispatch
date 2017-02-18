@@ -25,7 +25,41 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
     })->dispatch_CGI;
 
 =head1 DESCRIPTION
-  A Perl module which provides a simple and lightweight interface to the Alexa Skills Kit.
+
+  A Perl module which provides a simple and lightweight interface to the Amazon
+  Alexa Skills Kit
+
+=head1 METHODS
+
+  A list of methods available
+
+=head2 new
+
+  Create a new instance of Disptach.
+
+=over
+
+=over
+
+=item skillName
+
+  The name you wish to give this Alexa skill.  Used when displaying documentation.
+
+=item dispatch [array]
+
+  Any additional plugins you wish to dispatch to.  If you do not include any plugins
+  then this module will only be able to perform Hello requests.
+
+  If multiple plugins share the same method calls, the one listed first will be used.
+
+=item token_dispatch
+
+  By default uses the first plugin in your list.  If you wish to use a different
+  plugin for token creation/authentication then list that module here.
+
+=back
+
+=back
 
 =cut
 
@@ -37,7 +71,7 @@ sub new {
     push @$dispatch, 'Amazon::Alexa::Dispatch';
     my $node = {
         skillName => $args->{'skillName'} // 'SKILL',
-    dispatch => $dispatch,
+        dispatch => $dispatch,
         token_dispatch => $args->{'token_dispatch'} || $dispatch->[0],
     };
     foreach my $d (@$dispatch) {
@@ -133,8 +167,39 @@ sub _authenticate_token {
     1;
 }
 
+=head2 dispatch_CGI
+
+  Handles processing of calls in an apache or mod_perl environment.
+
+  Can handle 3 types of calls
+    1) Linking your Alexa skill
+    2) Displaying a generic help page
+    3) Processing an alexa skill request
+
+=over
+
+=over
+
+=item helpPage
+
+  Valid values are
+    1) full - (default) displays a large help page.  Useful to for setting up your skill
+    2) none - simply displays an empty HTML page
+       on the alexa developer site.
+    3) partial - (TODO) A simple blurp about your skill
+
+  New users will likely want assistance with the "full" setting.  However once you have
+  configured your alexa skill we recommend setting helpPage to "none" or "partial"
+
+=back
+
+=back
+
+=cut
+
 sub dispatch_CGI {
     my $self = shift;
+    my $args = shift;
     require CGI;
     my $cgi = CGI->new;
     my $json_raw = $cgi->param('POSTDATA');
@@ -157,19 +222,19 @@ sub dispatch_CGI {
     } elsif ($json_raw) {
         my $json_data= eval { decode_json($json_raw); };
         $self->_run_method($json_data);
+    } elsif (($args->{'helpPage'}//'') eq 'none') {
+        print "Content-Type:text/html\n\n";
     } else {
         print "Content-Type:text/html\n\n";
-        print 'You can configure your skill with the following data<br><br>';
         if (!$self->{'token_dispatch'}->can('alexa_create_token')) {
             print '<font color=red>WARNING</font>: Your skill does not support auto-linking with alexa.  Missing "alexa_create_token" method.<br>';
         }
-        print '
-<h1>Contents:</h1><ol>
+        print '<h1>Contents:</h1><ol>
 <li><a href="#schema">Intent Schema</a>
 <li><a href="#utterances">Sample Utterances</a>
 <li><a href="#intents">Intents</a>
 </ol>
-';
+You can configure your skill with the following data<br>';
 
         my $methodList = {};
         foreach my $module (@{$self->{'dispatch'}}) {
@@ -223,37 +288,118 @@ sub dispatch_CGI {
                 print '</ul>';
             }
         };
-use Data::Dumper;
-print '<pre>';
-print $self->{'skillName'};
-print Dumper $methodList;
     }
 }
 
+=head2 alexa_configure
+
+  All dispatch plugins should have this method.  It's used by the new plugin to configure
+  the dispatcher.
+
+=over
+
+=over
+
+=item intentPrefix
+
+  Recommended value is alexa_intent_, but anything can be used.
+
+  This value will be prepended to all intent requests coming from Alexa.  For example
+  if you have an intent called HelloIntent then the distpacher would look for a method
+  similar to Amazon::Alexa::Plugin->alexa_intent_HelloIntent()
+
+=back
+
+=back
+
+=cut
+
 sub alexa_configure {{
     intentPrefix => 'alexa_intent_',
-    skillName => 'Dispatcher',
 }}
+
+=head2 alexa_create_token
+
+  Should return nothing if no token was created.  Any other value will be assumed to
+  be the token to send back to Amazon.
+
+=over
+
+=over
+
+=item ARGS are a TODO, cleanup is required to make this work better first
+
+=back
+
+=back
+
+=cut
 
 sub alexa_create_token {
     die "[$me] Not supported\n";
 }
 
+=head2 alexa_authenticate_token( $method, $token )
+
+  Used by the dispatcher to grant access.  Two arguments are passed in.
+
+  If authentication is successful this method should return the "username" that is valid
+  within your environment.
+
+  If authentication fails, this method should die.
+
+=over
+
+=over
+
+=item method
+
+  This is the name of the action to be performed.  For example HelloIntent.
+
+=item token
+
+  The token provided by Amazon Alexa.
+
+=back
+
+=back
+
+=cut
+
 sub alexa_authenticate_token {
     return 'nobody';
 }
 
-sub alexa_intent_HelloIntent__meta { {
-    utterances => [
-        'hello',
-    ],
-    # slots => [{name=>"someName",type=>"someType"},{name=>"anotherName",type=>"anotherType"}]
-} }
+=head2 alexa_intent_HelloIntent( $user, $json )
+
+  A sample intent action that an Alexa skill can perform.  All skills will be passed
+  two values.  A user value (come from your alexa_authenticate_token) and the raw
+  json data from Amazon.
+
+  The return value should be the text that you wish Alexa to say in response to the
+  skill request.
+
+=cut
 
 sub alexa_intent_HelloIntent {
     return "Alexa dispatcher says hello\n";
 }
 
+=head2 alexa_intent_HelloIntent__meta
+
+ Basic meta information about your skill.  This will be used by the automatic
+ documentation to make it easier for others to create their own skills using your
+ plugin
+
+=cut
+
+sub alexa_intent_HelloIntent__meta {
+    return {
+        utterances => [
+            'hello',
+        ],
+        # slots => [{name=>"someName",type=>"someType"},{name=>"anotherName",type=>"anotherType"}]
+    }
+}
 
 1;
-__END__

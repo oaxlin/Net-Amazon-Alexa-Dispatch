@@ -1,0 +1,47 @@
+=pod
+
+=encoding UTF-8
+
+=head1 NAME
+
+Amazon::Alexa::Dispatch
+
+=head1 VERSION
+
+version 0.001
+
+=head1 SYNOPSIS
+
+  use Amazon::Alexa::Dispatch;
+
+  Amazon::Alexa::Dispatch->new({
+      dispatch=>'Amazon::Alexa::SomePlugin',
+      skillName=>'YourSkillName',
+    })->dispatch_CGI;
+
+  package Amazon::Alexa::SomePlugin {
+    sub alexa_configure {{
+        intentPrefix => 'alexa_intent_',
+    }}
+    sub alexa_intent_HelloIntent {
+        return "Hello"; # Simply return the text you wish Alexa to say
+    }
+    1;
+  };
+
+=head1 NAME
+
+Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
+
+=head1 AUTHOR
+
+Jason Terry <oaxlin@gmail.com>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2017 by Jason Terry.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut

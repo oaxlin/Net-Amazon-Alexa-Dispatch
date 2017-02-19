@@ -255,7 +255,8 @@ You can configure your skill with the following data<br>';
             my $m = quotemeta($module->{'intentPrefix'}//'');
             if ($m) {
                 no strict 'refs'; ## no critic
-                my @methods = grep { $_ =~ /^$m/ && $_ !~ /__meta$/ && $module->{'module'}->can($_) } sort keys %{$module->{'module'}.'::'};
+                my $mname = ref $module->{'module'} // $module->{'module'};
+                my @methods = grep { warn '  '.$_; $_ =~ /^$m/ && $_ !~ /__meta$/ && $module->{'module'}->can($_) } sort keys %{$mname.'::'};
                 use strict 'refs';
                 foreach my $method (@methods) {
                     my $intent = $method;
@@ -328,9 +329,12 @@ You can configure your skill with the following data<br>';
 
 =cut
 
-sub alexa_configure {{
-    intentPrefix => 'alexa_intent_',
-}}
+sub alexa_configure {
+    my $class = shift;
+    my $self = shift->{'Amazon::Alexa::Dispatch'};
+    $self->{'intentPrefix'} = 'alexa_intent_';
+    $self;
+}
 
 =head2 alexa_create_token
 

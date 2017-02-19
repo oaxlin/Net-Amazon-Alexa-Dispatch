@@ -127,6 +127,8 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
 =back
 
+=head2 alexa_login_helper ( $title, $blurb, $fields )
+
 =head2 alexa_authenticate_token( $method, $token )
 
   Used by the dispatcher to grant access.  Two arguments are passed in.

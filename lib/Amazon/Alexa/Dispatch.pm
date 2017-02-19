@@ -348,7 +348,7 @@ sub alexa_create_token {
     return '';
 }
 
-=head2 alexa_authenticate_token( $title, $blurb, $fields )
+=head2 alexa_login_helper ( $title, $blurb, $fields )
 
 =cut
 

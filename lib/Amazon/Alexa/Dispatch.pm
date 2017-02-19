@@ -91,7 +91,7 @@ sub new {
         $config->{$d}->{'Amazon::Alexa::Dispatch'} = $self;
         my $h = $d->alexa_configure($config->{$d});
         die "[$me] Skill plugin must support alexa_configure\n" unless ref $h eq 'HASH' or ref $h eq $d;
-        $self->{'token_dispatch'} = $h if ref $h ne 'HASH' && $d eq $self->{'token_dispatch'};
+        $self->{'token_dispatch'} = $h if ref $h eq $self->{'token_dispatch'};
         $d = {
             %$h,
             module => ref $h eq 'HASH' ? $d : $h,

@@ -281,7 +281,7 @@ You can configure your skill with the following data<br>';
             }
         };
         chop($out);chop($out);
-        print $out."  ]\n}</textarea><br>";
+        print $out."\n  ]\n}</textarea><br>";
 
         print '<a name="utterances"><h1>Sample Utternaces:</h1><textarea cols=100 rows=10>';
         foreach my $m (sort keys %$methodList) {

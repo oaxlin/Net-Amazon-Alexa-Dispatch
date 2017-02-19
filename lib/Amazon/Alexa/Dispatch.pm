@@ -7,6 +7,7 @@ use Time::Piece;
 use URI::Escape;
 
 my $me = 'Amazon::Alexa::Dispatch';
+my $dispatch_type; # currently CGI only
 
 =head1 NAME
 
@@ -200,6 +201,7 @@ sub _authenticate_token {
 sub dispatch_CGI {
     my $self = shift;
     my $args = shift;
+    $dispatch_type = 'CGI';
     require CGI;
     my $cgi = CGI->new;
     my $json_raw = $cgi->param('POSTDATA');
@@ -210,14 +212,14 @@ sub dispatch_CGI {
     ) {
         my $uri = $cgi->param('redirect_uri');
         my $state = $cgi->param('state');
-        my $token = $self->{'token_dispatch'}->alexa_create_token();
+        my $params = {$cgi->Vars};
+        my $token = $self->{'token_dispatch'}->alexa_create_token( $params );
         if ($token) {
             my $full = $uri.'#token_type=Bearer&access_token='.uri_escape($token).'&state='.uri_escape($state);
             print &CGI::header(-'status'=>302,-'location'=>$full,-'charset'=>'UTF-8',-'Pragma'=>'no-cache',-'Expires'=>'-2d');
+            print "Content-Type:text/html\n\nAlexa Link Created";
         } else {
-            # should never get here if the alexa_create_token was built properly.
-            print "Content-Type:text/html\n\n";
-            print "Something went wrong.  Please try to link the skill again\n";
+            # no token was created.  hopefully they displayed some sort of login page as part of the alexa_create_token call
         }
     } elsif ($json_raw) {
         my $json_data= eval { decode_json($json_raw); };
@@ -233,6 +235,7 @@ sub dispatch_CGI {
 <li><a href="#schema">Intent Schema</a>
 <li><a href="#utterances">Sample Utterances</a>
 <li><a href="#intents">Intents</a>
+<li><a href="?response_type=token&redirect_uri=fake&state=fake&client_id=fake">Alexa Link Page</a>
 </ol>
 You can configure your skill with the following data<br>';
 
@@ -336,7 +339,40 @@ sub alexa_configure {{
 =cut
 
 sub alexa_create_token {
-    die "[$me] Not supported\n";
+    my ($self,$param) = @_;
+    return 'fake' if ($param->{'Password'} && $param->{'Password'} eq 'fake');
+    my $fields = {};
+    $fields->{$_} = { type=>'hidden', value=> $param->{$_} } foreach keys %$param;
+    $fields->{'Password'} = { type=>'password' };
+    $self->alexa_login_helper( 'Fake Alexa Login','Please type "fake" into the password field.', $fields );
+    return '';
+}
+
+=head2 alexa_authenticate_token( $title, $blurb, $fields )
+
+=cut
+
+sub alexa_login_helper {
+    my $self = shift;
+    $self->_alexa_login_helper_CGI(@_) if $dispatch_type eq 'CGI';
+}
+
+sub _alexa_login_helper_CGI {
+    my ($self,$title,$blurb, $fields) = @_;
+    print "Content-Type:text/html\n\n<html><head><title>".&CGI::escapeHTML($title)."</title></head><body>";
+    print '<h1>'.&CGI::escapeHTML($title).'</h1>';
+    print &CGI::escapeHTML($blurb).'<br><br><form><table>';
+    foreach my $field (keys %$fields) {
+        if ($fields->{$field}->{'type'} eq 'password') {
+            print '<tr><td>'.&CGI::escapeHTML($field).'</td><td><input type=password name="'.&CGI::escapeHTML($field).'"></td></tr>';
+        } elsif ($fields->{$field}->{'type'} eq 'hidden') {
+            print '<input type=hidden name="'.&CGI::escapeHTML($field).'" value="'.&CGI::escapeHTML($fields->{$field}->{'value'}).'"></td></tr>';
+        } else {
+            print '<tr><td>x</td><td>x</td></tr>';
+        }
+    }
+    print '<tr><td colspan=2 align=center><br><input type=submit></td></tr>';
+    print '</form></table></body></html>';
 }
 
 =head2 alexa_authenticate_token( $method, $token )
@@ -367,7 +403,9 @@ sub alexa_create_token {
 =cut
 
 sub alexa_authenticate_token {
-    return 'nobody';
+    my ($class, $method, $p) = @_;
+    return 'nobody' if $p eq 'fake' && $method eq 'alexa_intent_HelloIntent';
+    return '';
 }
 
 =head2 alexa_intent_HelloIntent( $user, $json )

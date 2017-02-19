@@ -71,22 +71,33 @@ sub new {
     $dispatch = [$dispatch] if $dispatch && !ref $dispatch;
     push @$dispatch, 'Amazon::Alexa::Dispatch';
     my $node = {
+        configFile => $args->{'configFile'},
         skillName => $args->{'skillName'} // 'SKILL',
         dispatch => $dispatch,
         token_dispatch => $args->{'token_dispatch'} || $dispatch->[0],
     };
+    my $config = { 'Amazon::Alexa::Dispatch' => { alexa_token => 'fake'} };
+    if ($args->{'configFile'}) {
+      local $/;
+      open( my $fh, '<', $args->{'configFile'} );
+      my $json_text   = <$fh>;
+      $config = decode_json( $json_text );
+    }
+    my $self = bless $node, $class;
     foreach my $d (@$dispatch) {
-        eval "require $d"; ## no critic
+        eval "require $d" or die $@; ## no critic
         die "[$me] Skill plugin must support alexa_authenticate_token\n" unless $d->can('alexa_authenticate_token');
         die "[$me] Skill plugin must support alexa_configure\n" unless $d->can('alexa_configure');
-        my $h = $d->alexa_configure;
-        die "[$me] Skill plugin must support alexa_configure\n" unless ref $h eq 'HASH';
+        $config->{$d}->{'Amazon::Alexa::Dispatch'} = $self;
+        my $h = $d->alexa_configure($config->{$d});
+        die "[$me] Skill plugin must support alexa_configure\n" unless ref $h eq 'HASH' or ref $h eq $d;
+        $self->{'token_dispatch'} = $h if ref $h ne 'HASH' && $d eq $self->{'token_dispatch'};
         $d = {
             %$h,
-            module => $d,
+            module => ref $h eq 'HASH' ? $d : $h,
         };
     }
-    return bless $node, $class;
+    return $self;
 }
 
 sub _run_method {
@@ -420,6 +431,7 @@ sub alexa_authenticate_token {
 =cut
 
 sub alexa_intent_HelloIntent {
+    my ($class, $user, $json) = @_;
     return "Alexa dispatcher says hello\n";
 }
 

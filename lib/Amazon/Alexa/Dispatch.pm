@@ -256,7 +256,7 @@ You can configure your skill with the following data<br>';
             if ($m) {
                 no strict 'refs'; ## no critic
                 my $mname = ref $module->{'module'} // $module->{'module'};
-                my @methods = grep { warn '  '.$_; $_ =~ /^$m/ && $_ !~ /__meta$/ && $module->{'module'}->can($_) } sort keys %{$mname.'::'};
+                my @methods = grep { $_ =~ /^$m/ && $_ !~ /__meta$/ && $module->{'module'}->can($_) } sort keys %{$mname.'::'};
                 use strict 'refs';
                 foreach my $method (@methods) {
                     my $intent = $method;

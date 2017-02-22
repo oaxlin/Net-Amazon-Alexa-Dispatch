@@ -392,7 +392,7 @@ sub alexa_configure {
 
   A has containing the name/value pairs of all data submitted with the alexa skill request.
 
-  Values provied by Amazon include
+  Values provided by Amazon include
     response_type
     redirect_uri
     state

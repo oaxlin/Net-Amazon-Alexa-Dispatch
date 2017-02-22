@@ -349,12 +349,19 @@ You can configure your skill with the following data<br>';
     }
 }
 
-=head2 alexa_configure
+=head2 alexa_configure ( $config )
 
   All dispatch plugins should have this method.  It's used by the new plugin to configure
   the dispatcher.
 
 =over
+
+=item $config
+
+  A hash containing config data meant for your plugin.  This can come from a config
+  file, or be hard coded into your script.
+
+  Plugins can define their own configuration needs.
 
 =over
 
@@ -390,7 +397,7 @@ sub alexa_configure {
 
 =item $param
 
-  A has containing the name/value pairs of all data submitted with the alexa skill request.
+  A hash containing the name/value pairs of all data submitted with the alexa skill request.
 
   Values provided by Amazon include
     response_type

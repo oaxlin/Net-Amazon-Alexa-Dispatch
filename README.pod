@@ -112,7 +112,7 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
 =back
 
-=head2 alexa_create_token
+=head2 alexa_create_token ( $param )
 
   Should return nothing if no token was created.  Any other value will be assumed to
   be the token to send back to Amazon.
@@ -121,13 +121,61 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
 =over
 
-=item ARGS are a TODO, cleanup is required to make this work better first
+=item $param
+
+  A has containing the name/value pairs of all data submitted with the alexa skill request.
+
+  Values provied by Amazon include
+    response_type
+    redirect_uri
+    state
+    client_id
+
+  You can use any additional paramaters as needed.  So long as they do not conflict with the
+  four amazon names above.
 
 =back
 
 =back
 
 =head2 alexa_login_helper ( $title, $blurb, $fields )
+
+  A simple helper script to display a very trival login page to users who
+  are linking the Alexa skill on their mobile device.
+
+=over
+
+=over
+
+=item $title
+
+  The title you wish to display at the top of the page.
+
+=item $blurb
+
+  A small paragraph or so of text to display below the title.
+
+=item $fields
+
+  A definition of field data to request from the user.
+
+  Example
+
+  $fields = {
+     client_id => {
+         type => 'hidden',
+         value => '123',
+     },
+     my_password_key => {
+         type => 'password',
+         value => undef, # since the customer types this in themselves
+     },
+     ......
+  };
+
+=back
+
+=back
 
 =head2 alexa_authenticate_token( $method, $token )
 

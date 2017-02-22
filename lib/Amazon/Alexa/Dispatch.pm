@@ -379,7 +379,7 @@ sub alexa_configure {
     $self;
 }
 
-=head2 alexa_create_token
+=head2 alexa_create_token ( $param )
 
   Should return nothing if no token was created.  Any other value will be assumed to
   be the token to send back to Amazon.
@@ -388,7 +388,18 @@ sub alexa_configure {
 
 =over
 
-=item ARGS are a TODO, cleanup is required to make this work better first
+=item $param
+
+  A has containing the name/value pairs of all data submitted with the alexa skill request.
+
+  Values provied by Amazon include
+    response_type
+    redirect_uri
+    state
+    client_id
+
+  You can use any additional paramaters as needed.  So long as they do not conflict with the
+  four amazon names above.
 
 =back
 
@@ -408,6 +419,43 @@ sub alexa_create_token {
 
 =head2 alexa_login_helper ( $title, $blurb, $fields )
 
+  A simple helper script to display a very trival login page to users who
+  are linking the Alexa skill on their mobile device.
+
+=over
+
+=over
+
+=item $title
+
+  The title you wish to display at the top of the page.
+
+=item $blurb
+
+  A small paragraph or so of text to display below the title.
+
+=item $fields
+
+  A definition of field data to request from the user.
+
+  Example
+
+  $fields = {
+     client_id => {
+         type => 'hidden',
+         value => '123',
+     },
+     my_password_key => {
+         type => 'password',
+         value => undef, # since the customer types this in themselves
+     },
+     ......
+  };
+
+=back
+
+=back
+
 =cut
 
 sub alexa_login_helper {
@@ -416,7 +464,7 @@ sub alexa_login_helper {
 }
 
 sub _alexa_login_helper_CGI {
-    my ($self,$title,$blurb, $fields) = @_;
+    my ($self, $title, $blurb, $fields) = @_;
     print "Content-Type:text/html\n\n<html><head><title>".&CGI::escapeHTML($title)."</title></head><body>";
     print '<h1>'.&CGI::escapeHTML($title).'</h1>';
     print &CGI::escapeHTML($blurb).'<br><br><form><table>';

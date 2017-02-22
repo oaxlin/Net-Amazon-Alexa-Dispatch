@@ -5,6 +5,8 @@ use JSON;
 use Net::OAuth2;
 use Time::Piece;
 use URI::Escape;
+use Clone qw{clone};
+use Tie::IxHash;
 
 my $me = 'Amazon::Alexa::Dispatch';
 my $dispatch_type; # currently CGI only
@@ -244,6 +246,7 @@ sub dispatch_CGI {
         }
         print '<h1>Contents:</h1><ol>
 <li><a href="#schema">Intent Schema</a>
+<li><a href="#slots">Custom Slot Types</a>
 <li><a href="#utterances">Sample Utterances</a>
 <li><a href="#intents">Intents</a>
 <li><a href="?response_type=token&redirect_uri=fake&state=fake&client_id=fake">Alexa Link Page</a>
@@ -271,17 +274,57 @@ You can configure your skill with the following data<br>';
             }
         }
 
-        print '<a name="schema"><h1>Intent Schema:</h1><textarea cols=100 rows=10>{"intents": ['."\n";
+        my $custom_slots = {};
+        print '<a name="schema"><h1>Intent Schema:</h1><textarea wrap=off cols=100 rows=10>{"intents": ['."\n";
         my $out = '';
         foreach my $m (sort keys %$methodList) {
             foreach my $i (@{$methodList->{$m}}) {
-                my $schema = {intent=>$i->{'intent'}};
-                $schema->{'slots'} = $i->{'meta'}->{'slots'} if $i->{'meta'}->{'slots'};
+                tie(my %myhash, 'Tie::IxHash', 'intent' => $i->{'intent'}); # super annoying when the intent isn't first
+                my $schema = \%myhash;
+
+                if ($i->{'meta'}->{'slots'}) {
+                    $schema->{'slots'} = clone $i->{'meta'}->{'slots'};
+                    foreach my $slot (@{$schema->{'slots'}}) {
+                        $custom_slots->{$slot->{'name'}} = $slot->{'values'};
+                        delete $slot->{'values'}; # intent schema doesn't want this
+                    }
+                }
                 $out .= &CGI::escapeHTML('    '.to_json($schema).",\n");
             }
         };
         chop($out);chop($out);
         print $out."\n  ]\n}</textarea><br>";
+
+        print '<a name="slots"><h1>Custom Slot Types:</h1>';
+        if (!scalar keys %$custom_slots) {
+            print 'There are not custom slot types.';
+        } else {
+            print '<table cellpadding=3>';
+            print '<tr><th></th><th>Type</th><th></th><th>Values</th></tr>';
+            print "<script>function alexa_copy(id) {
+                document.getElementById('copyarea').innerHTML = document.getElementById(id).innerHTML;
+                document.getElementById('copyarea').style.display = '';
+                document.getElementById('copyarea').select();
+                document.execCommand('copy');
+            }</script>";
+
+            my $id;
+            foreach my $name (sort keys %$custom_slots) {
+                if (ref $custom_slots->{$name}) {
+                    $id++;
+                    my $n = 'copyarea'.$id;
+                    print '<tr><td><a href="javascript:alexa_copy(\''.$n.'\');">Show</a></td>';
+                    print '<td>'.&CGI::escapeHTML($name).'</td><td>-</td>';
+                    my $v = join ' | ', @{$custom_slots->{$name}};
+                    $v = substr($v,0,200).'...' if length $v > 200;
+                    print '<td>'.&CGI::escapeHTML($v).'<textarea style="display:none" id='.$n.'>'
+                        .&CGI::escapeHTML(join "\n", @{$custom_slots->{$name}}).'</textarea></td>';
+                    print '</tr>';
+                }
+            }
+            print '</table><textarea id=copyarea style="display:none" cols=100 rows=5></textarea>';
+        }
+
 
         print '<a name="utterances"><h1>Sample Utternaces:</h1><textarea cols=100 rows=10>';
         foreach my $m (sort keys %$methodList) {
@@ -452,7 +495,7 @@ sub alexa_intent_HelloIntent__meta {
         utterances => [
             'hello',
         ],
-        # slots => [{name=>"someName",type=>"someType"},{name=>"anotherName",type=>"anotherType"}]
+        # slots => [{name=>"someName",type=>"AMAZON.NUMBER"},{name=>"anotherName",type=>"customName",values=>[1,2,3]}]
     }
 }
 

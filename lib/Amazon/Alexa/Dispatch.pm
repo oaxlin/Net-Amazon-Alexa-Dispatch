@@ -121,7 +121,19 @@ sub _run_method {
         };
         $e = $@;
         $resp = $self->_msg_to_hash('Failed to authenticate.  Please use the Alexa mobile app to re link this skill.',$e) if $e || !$ok;
-        $resp = $module->{'module'}->$method($self->{'user'},$json) unless $resp;
+
+
+	my $easy_args = {}; # simplify pulling args out of the Amazon api
+	if (ref $json->{'request'} eq 'HASH'
+		&& exists $json->{'request'}->{'intent'}
+		&& ref $json->{'request'}->{'intent'} eq 'HASH'
+		&& exists $json->{'request'}->{'intent'}->{'slots'}
+	) {
+		foreach my $key (keys %{$json->{'request'}->{'intent'}->{'slots'}}) {
+			$easy_args->{$key} = $json->{'request'}->{'intent'}->{'slots'}->{$key}->{'value'};
+		}
+	}
+        $resp = $module->{'module'}->$method($self->{'user'},$easy_args,$json) unless $resp;
     }
     $self->_print_json($resp);
 }
@@ -245,6 +257,7 @@ sub dispatch_CGI {
             print '<font color=red>WARNING</font>: Your skill does not support auto-linking with alexa.  Missing "alexa_create_token" method.<br>';
         }
         print '<h1>Contents:</h1><ol>
+<li><a href="#schema">Amazon Developer Login</a>
 <li><a href="#schema">Intent Schema</a>
 <li><a href="#slots">Custom Slot Types</a>
 <li><a href="#utterances">Sample Utterances</a>
@@ -275,6 +288,7 @@ You can configure your skill with the following data<br>';
         }
 
         my $custom_slots = {};
+        print '<a name="schema"><h1>Amazon Developer Login:</h1><a href="https://www.amazon.com/ap/signin">https://www.amazon.com/ap/signin</a>';
         print '<a name="schema"><h1>Intent Schema:</h1><textarea wrap=off cols=100 rows=10>{"intents": ['."\n";
         my $out = '';
         foreach my $m (sort keys %$methodList) {

@@ -55,30 +55,6 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
   If multiple plugins share the same method calls, the one listed first will be used.
 
-  When dispatching to a method that method should accept the following arguments
-
-=over
-
-=item user
-
-  The amazon user making the call.
-
-=item args
-
-  A simplified hash of the slot arguments.
-
-  {
-    slot_name_1 => value1,
-    slot_name_2 => value2,
-    etc...
-  }
-
-=item json
-
-  The raw decoded JSON straight from amazon.
-
-=back
-
 =item token_dispatch
 
   By default uses the first plugin in your list.  If you wish to use a different
@@ -559,11 +535,30 @@ sub alexa_authenticate_token {
     return '';
 }
 
-=head2 alexa_intent_HelloIntent( $user, $json )
+=head2 alexa_intent_HelloIntent( $user, $args, $json )
 
   A sample intent action that an Alexa skill can perform.  All skills will be passed
-  two values.  A user value (come from your alexa_authenticate_token) and the raw
-  json data from Amazon.
+  three values.
+
+=over
+
+=over
+
+=item $user
+
+  A user value (comes from your alexa_authenticate_token)
+
+=item $args
+
+  A simple hash containing all the "slot" data from Amazon.
+
+=item $json
+
+  Raw json data from Amazon.
+
+=back
+
+=back
 
   The return value should be the text that you wish Alexa to say in response to the
   skill request.
@@ -571,7 +566,7 @@ sub alexa_authenticate_token {
 =cut
 
 sub alexa_intent_HelloIntent {
-    my ($class, $user, $json) = @_;
+    my ($class, $user, $args, $json) = @_;
     return "Alexa dispatcher says hello\n";
 }
 

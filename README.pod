@@ -209,11 +209,30 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
 =back
 
-=head2 alexa_intent_HelloIntent( $user, $json )
+=head2 alexa_intent_HelloIntent( $user, $args, $json )
 
   A sample intent action that an Alexa skill can perform.  All skills will be passed
-  two values.  A user value (come from your alexa_authenticate_token) and the raw
-  json data from Amazon.
+  three values.
+
+=over
+
+=over
+
+=item $user
+
+  A user value (comes from your alexa_authenticate_token)
+
+=item $args
+
+  A simple hash containing all the "slot" data from Amazon.
+
+=item $json
+
+  Raw json data from Amazon.
+
+=back
+
+=back
 
   The return value should be the text that you wish Alexa to say in response to the
   skill request.

@@ -133,7 +133,7 @@ sub _run_method {
 			$easy_args->{$key} = $json->{'request'}->{'intent'}->{'slots'}->{$key}->{'value'};
 		}
 	}
-        $resp = $module->{'module'}->$method($self->{'user'},$easy_args,$json) unless $resp;
+        $resp = $module->{'module'}->$method($easy_args,$json) unless $resp;
     }
     $self->_print_json($resp);
 }
@@ -535,18 +535,14 @@ sub alexa_authenticate_token {
     return '';
 }
 
-=head2 alexa_intent_HelloIntent( $user, $args, $json )
+=head2 alexa_intent_HelloIntent( $args, $json )
 
   A sample intent action that an Alexa skill can perform.  All skills will be passed
-  three values.
+  two values.
 
 =over
 
 =over
-
-=item $user
-
-  A user value (comes from your alexa_authenticate_token)
 
 =item $args
 
@@ -566,7 +562,7 @@ sub alexa_authenticate_token {
 =cut
 
 sub alexa_intent_HelloIntent {
-    my ($class, $user, $args, $json) = @_;
+    my ($class, $args, $json) = @_;
     return "Alexa dispatcher says hello\n";
 }
 

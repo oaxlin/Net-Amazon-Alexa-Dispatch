@@ -20,11 +20,12 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
   use Amazon::Alexa::Dispatch;
 
   Amazon::Alexa::Dispatch->new({
+      skillName=>'YourSkillName',
+      configFile=>'/home/oaxlin/config_alexa.json',
       dispatch=>[
           'Amazon::Alexa::SomePlugin',
           'Amazon::Alexa::AnotherPlugin'
       ],
-      skillName=>'YourSkillName',
     })->dispatch_CGI;
 
 =head1 DESCRIPTION
@@ -526,11 +527,11 @@ sub _alexa_login_helper_CGI {
 
 =over
 
-=item method
+=item $method
 
   This is the name of the action to be performed.  For example HelloIntent.
 
-=item token
+=item $token
 
   The token provided by Amazon Alexa.
 

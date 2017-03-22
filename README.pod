@@ -86,6 +86,8 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
   New users will likely want assistance with the "full" setting.  However once you have
   configured your alexa skill we recommend setting helpPage to "none" or "partial"
 
+  Note: can also be set in the JSON config file
+
 =back
 
 =back
@@ -94,6 +96,8 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
   All dispatch plugins should have this method.  It's used by the new plugin to configure
   the dispatcher.
+
+=over
 
 =over
 
@@ -113,6 +117,8 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
   This value will be prepended to all intent requests coming from Alexa.  For example
   if you have an intent called HelloIntent then the distpacher would look for a method
   similar to Amazon::Alexa::Plugin->alexa_intent_HelloIntent()
+
+=back
 
 =back
 

@@ -75,6 +75,7 @@ sub new {
     my $node = {
         configFile => $args->{'configFile'},
         skillName => $args->{'skillName'} // 'SKILL',
+        helpPage => $args->{'helpPage'},
         dispatch => $dispatch,
         token_dispatch => $args->{'token_dispatch'} || $dispatch->[0],
     };
@@ -98,6 +99,11 @@ sub new {
             %$h,
             module => ref $h eq 'HASH' ? $d : $h,
         };
+    }
+    foreach my $key (keys %{$config->{'Amazon::Alexa::Dispatch'}}) {
+        next if $key eq 'Amazon::Alexa::Dispatch';
+        # Allow config info to come from the json config file
+        $self->{$key} //= $config->{'Amazon::Alexa::Dispatch'}->{$key};
     }
     return $self;
 }
@@ -216,6 +222,8 @@ sub _authenticate_token {
   New users will likely want assistance with the "full" setting.  However once you have
   configured your alexa skill we recommend setting helpPage to "none" or "partial"
 
+  Note: can also be set in the JSON config file
+
 =back
 
 =back
@@ -248,7 +256,7 @@ sub dispatch_CGI {
     } elsif ($json_raw) {
         my $json_data= eval { decode_json($json_raw); };
         $self->_run_method($json_data);
-    } elsif (($args->{'helpPage'}//'') eq 'none') {
+    } elsif (($args->{'helpPage'}//$self->{'helpPage'}//'') eq 'none') {
         print "Content-Type:text/html\n\n";
     } else {
         print "Content-Type:text/html\n\n";
@@ -369,6 +377,8 @@ You can configure your skill with the following data<br>';
 
 =over
 
+=over
+
 =item $config
 
   A hash containing config data meant for your plugin.  This can come from a config
@@ -385,6 +395,8 @@ You can configure your skill with the following data<br>';
   This value will be prepended to all intent requests coming from Alexa.  For example
   if you have an intent called HelloIntent then the distpacher would look for a method
   similar to Amazon::Alexa::Plugin->alexa_intent_HelloIntent()
+
+=back
 
 =back
 

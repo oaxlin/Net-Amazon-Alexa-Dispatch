@@ -55,6 +55,30 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
   If multiple plugins share the same method calls, the one listed first will be used.
 
+  When dispatching to a method that method should accept the following arguments
+
+=over
+
+=item user
+
+  The amazon user making the call.
+
+=item args
+
+  A simplified hash of the slot arguments.
+
+  {
+    slot_name_1 => value1,
+    slot_name_2 => value2,
+    etc...
+  }
+
+=item json
+
+  The raw decoded JSON straight from amazon.
+
+=back
+
 =item token_dispatch
 
   By default uses the first plugin in your list.  If you wish to use a different

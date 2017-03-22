@@ -210,9 +210,8 @@ sub _authenticate_token {
 
   Valid values are
     1) full - (default) displays a large help page.  Useful to for setting up your skill
-    2) none - simply displays an empty HTML page
-       on the alexa developer site.
-    3) partial - (TODO) A simple blurp about your skill
+    2) none - simply displays an empty HTML page.
+    3) partial - (TODO) A simple blurb about your skill
 
   New users will likely want assistance with the "full" setting.  However once you have
   configured your alexa skill we recommend setting helpPage to "none" or "partial"

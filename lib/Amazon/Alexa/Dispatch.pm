@@ -31,18 +31,18 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
 =head1 DESCRIPTION
 
-  A Perl module which provides a simple and lightweight interface to the Amazon
-  Alexa Skills Kit
+A Perl module which provides a simple and lightweight interface to the Amazon
+Alexa Skills Kit
 
 =head1 METHODS
 
-  A list of methods available
+A list of methods available
 
 =head2 new
 
-  Create a new instance of Disptach.
+Create a new instance of Disptach.
 
-  All options can be passed into the new directly, or loaded from the "configFile"
+All options can be passed into the new directly, or loaded from the "configFile"
 
 =over
 
@@ -50,13 +50,13 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
 =item configFile
 
-  OPTIONAL - The path to a perl evalable config file.
+OPTIONAL - The path to a perl evalable config file.
 
 =item skillName
 
-  The name you wish to give this Alexa skill.  Used when displaying documentation.
+The name you wish to give this Alexa skill.  Used when displaying documentation.
 
-  Defaults to "Alexa Skill" if nothing is configured.
+Defaults to "Alexa Skill" if nothing is configured.
 
 =item dispatch [array]
 
@@ -199,7 +199,7 @@ sub _find_module {
 
 =head2 run_method
 
-  Parses the Amazon data and routes it to the appropriate module/method.
+Parses the Amazon data and routes it to the appropriate module/method.
 
 =over
 
@@ -207,7 +207,7 @@ sub _find_module {
 
 =item $json
 
-  Raw json data from Amazon.
+Raw json data from Amazon.
 
 =back
 
@@ -243,7 +243,7 @@ sub run_method {
 
 =head2 intent_prefix
 
-  Simply returns the intent_prefix value used by this module
+Simply returns the intent_prefix value used by this module
 
 =cut
 
@@ -251,9 +251,9 @@ sub intent_prefix { return 'alexa_intent_' }
 
 =head2 skill_name
 
-  Simply returns the value configured in Config->skillName
+Simply returns the value configured in Config->skillName
 
-  Defaults to "Alexa Skill" if nothing is configured.
+Defaults to "Alexa Skill" if nothing is configured.
 
 =cut
 
@@ -263,11 +263,11 @@ sub skill_name {
 
 =head2 alexa_authenticate_params ( $param )
 
-  Used by the dispatcher to grant access.
+Used by the dispatcher to grant access.
 
-  If authentication is successful this method should return the token.
+If authentication is successful this method should return the token.
 
-  If authentication fails, this method return undef or die.
+If authentication fails, this method return undef or die.
 
 =over
 
@@ -275,18 +275,18 @@ sub skill_name {
 
 =item $param
 
-  A hash containing the name/value pairs of all data submitted with the alexa skill request.
+A hash containing the name/value pairs of all data submitted with the alexa skill request.
 
-  Values provided by Amazon include
-    response_type
-    redirect_uri
-    state
-    client_id
+Values provided by Amazon include
+  response_type
+  redirect_uri
+  state
+  client_id
 
-  Values expected by Amazon::Alexa::Dispatch
-    Password
+Values expected by Amazon::Alexa::Dispatch
+  Password
 
-  You can use any additional paramaters as needed.  So long as they do not conflict with the names above.
+You can use any additional paramaters as needed.  So long as they do not conflict with the names above.
 
 =back
 
@@ -308,11 +308,11 @@ sub alexa_authenticate_params {
 
 =head2 alexa_authenticate_json ( $json )
 
-  Used by the dispatcher to grant access.
+Used by the dispatcher to grant access.
 
-  If authentication is successful this method should return a true value.
+If authentication is successful this method should return a true value.
 
-  If authentication fails, this method return undef or die.
+If authentication fails, this method return undef or die.
 
 =over
 
@@ -320,7 +320,7 @@ sub alexa_authenticate_params {
 
 =item $json
 
-  Raw json data from Amazon.
+Raw json data from Amazon.
 
 =back
 
@@ -374,8 +374,8 @@ sub alexa_authenticate_json {
 
 =head2 alexa_intent_HelloIntent( $args, $json )
 
-  A sample intent action that an Alexa skill can perform.  All skills will be passed
-  two values.
+A sample intent action that an Alexa skill can perform.  All skills will be passed
+two values.
 
 =over
 
@@ -383,18 +383,18 @@ sub alexa_authenticate_json {
 
 =item $args
 
-  A simple hash containing all the "slot" data from Amazon.
+A simple hash containing all the "slot" data from Amazon.
 
 =item $json
 
-  Raw json data from Amazon.
+Raw json data from Amazon.
 
 =back
 
 =back
 
-  The return value should be the text that you wish Alexa to say in response to the
-  skill request.
+The return value should be the text that you wish Alexa to say in response to the
+skill request.
 
 =cut
 
@@ -405,9 +405,9 @@ sub alexa_intent_HelloIntent {
 
 =head2 alexa_intent_HelloIntent__meta
 
- Basic meta information about your skill.  This will be used by the automatic
- documentation to make it easier for others to create their own skills using your
- plugin
+Basic meta information about your skill.  This will be used by the automatic
+documentation to make it easier for others to create their own skills using your
+plugin
 
 =cut
 

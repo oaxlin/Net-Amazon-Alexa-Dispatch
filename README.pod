@@ -58,14 +58,13 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
 =item dispatch [array]
 
-  Any additional plugins you wish to dispatch to.  If you do not include any plugins
-  then this module will only be able to perform Hello requests.
+Any additional plugins you wish to dispatch to.  If you do not include any plugins then this module will only be able to perform Hello requests.
 
-  Plugins added during "new" will be processed before any in a config file.
+Plugins added during "new" will be processed before any in a config file.
 
-  If multiple plugins share the same method calls, the one listed first will be used.
+If multiple plugins share the same method calls, the one listed first will be used.
 
-  Please note all plugins must use the same token for authentication
+Please note all plugins must use the same token for authentication
 
 =back
 
@@ -73,7 +72,7 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
 =head2 msg_to_hash
 
-  Parses the message and turns it into a hash suitable to be JSONified for Alexa
+Parses the message and turns it into a hash suitable to be JSONified for Alexa
 
 =over
 
@@ -81,20 +80,20 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
 =item $ret
 
-  Raw response, coulde be one of
+Raw response, coulde be one of
   1) Already existing well formatted Alexa HASH response
   2) Simple text
   3) Throw object, with alexa_safe=>1 set
 
-  Be careful to not send die text to this method as they look just like simple text.  A good way to "escape" die messages is to return them like this
+Be careful to not send die text to this method as they look just like simple text.  A good way to "escape" die messages is to return them like this
 
   return { error => $@ } if $@;
 
 =item $default
 
-  This text will be used if the value of $ret does not fit the above criteria
+This text will be used if the value of $ret does not fit the above criteria
 
-  If no default is provided then 'Skill returned invalid response data' will be used
+If no default is provided then 'Skill returned invalid response data' will be used
 
 =back
 

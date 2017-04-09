@@ -82,8 +82,11 @@ Parses the message and turns it into a hash suitable to be JSONified for Alexa
 =item $ret
 
 Raw response, coulde be one of
+
   1) Already existing well formatted Alexa HASH response
+
   2) Simple text
+
   3) Throw object, with alexa_safe=>1 set
 
 Be careful to not send die text to this method as they look just like simple text.  A good way to "escape" die messages is to return them like this

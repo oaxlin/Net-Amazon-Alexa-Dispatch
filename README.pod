@@ -14,14 +14,15 @@ version 0.001
 
   use Amazon::Alexa::Dispatch;
 
-  Amazon::Alexa::Dispatch->new({
+  my $alexa = Amazon::Alexa::Dispatch->new({
       skillName=>'YourSkillName',
       configFile=>'/home/oaxlin/config_alexa.json',
       dispatch=>[
           'Amazon::Alexa::SomePlugin',
           'Amazon::Alexa::AnotherPlugin'
       ],
-    })->dispatch_CGI;
+    });
+  $alexa->run_method($json);
 
 =head1 DESCRIPTION
 

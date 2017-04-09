@@ -40,95 +40,97 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
   Create a new instance of Disptach.
 
+  All options can be passed into the new directly, or loaded from the "configFile"
+
 =over
 
 =over
+
+=item configFile
+
+  OPTIONAL - The path to a perl evalable config file.
 
 =item skillName
 
   The name you wish to give this Alexa skill.  Used when displaying documentation.
+
+  Defaults to "Alexa Skill" if nothing is configured.
 
 =item dispatch [array]
 
   Any additional plugins you wish to dispatch to.  If you do not include any plugins
   then this module will only be able to perform Hello requests.
 
+  Plugins added during "new" will be processed before any in a config file.
+
   If multiple plugins share the same method calls, the one listed first will be used.
 
-=item token_dispatch
-
-  By default uses the first plugin in your list.  If you wish to use a different
-  plugin for token creation/authentication then list that module here.
+  Please note all plugins must use the same token for authentication
 
 =back
 
 =back
 
-=head2 dispatch_CGI
+=head2 msg_to_hash
 
-  Handles processing of calls in an apache or mod_perl environment.
-
-  Can handle 3 types of calls
-    1) Linking your Alexa skill
-    2) Displaying a generic help page
-    3) Processing an alexa skill request
+  Parses the message and turns it into a hash suitable to be JSONified for Alexa
 
 =over
 
 =over
 
-=item helpPage
+=item $ret
 
-  Valid values are
-    1) full - (default) displays a large help page.  Useful to for setting up your skill
-    2) none - simply displays an empty HTML page.
-    3) partial - (TODO) A simple blurb about your skill
+  Raw response, coulde be one of
+  1) Already existing well formatted Alexa HASH response
+  2) Simple text
+  3) Throw object
 
-  New users will likely want assistance with the "full" setting.  However once you have
-  configured your alexa skill we recommend setting helpPage to "none" or "partial"
+  Be careful to not send die text to this method as they look just like simple text
 
-  Note: can also be set in the JSON config file
+=item $default
+
+  This text will be used if the value of $ret is not safe
+
+  If no default is provided then 'Skill returned invalid response data' will be used
 
 =back
 
 =back
 
-=head2 alexa_configure ( $config )
+=head2 run_method
 
-  All dispatch plugins should have this method.  It's used by the new plugin to configure
-  the dispatcher.
+  Parses the Amazon data and routes it to the appropriate module/method.
 
 =over
 
 =over
 
-=item $config
+=item $json
 
-  A hash containing config data meant for your plugin.  This can come from a config
-  file, or be hard coded into your script.
-
-  Plugins can define their own configuration needs.
-
-=over
-
-=item intentPrefix
-
-  Recommended value is alexa_intent_, but anything can be used.
-
-  This value will be prepended to all intent requests coming from Alexa.  For example
-  if you have an intent called HelloIntent then the distpacher would look for a method
-  similar to Amazon::Alexa::Plugin->alexa_intent_HelloIntent()
+  Raw json data from Amazon.
 
 =back
 
 =back
 
-=back
+=head2 intent_prefix
 
-=head2 alexa_create_token ( $param )
+  Simply returns the intent_prefix value used by this module
 
-  Should return nothing if no token was created.  Any other value will be assumed to
-  be the token to send back to Amazon.
+=head2 skill_name
+
+  Simply returns the value configured in Config->skillName
+
+  Defaults to "Alexa Skill" if nothing is configured.
+
+=head2 alexa_authenticate_params ( $param )
+
+  Used by the dispatcher to grant access.
+
+  If authentication is successful this method should return the token.
+
+  If authentication fails, this method return undef or die.
 
 =over
 
@@ -144,72 +146,30 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
     state
     client_id
 
-  You can use any additional paramaters as needed.  So long as they do not conflict with the
-  four amazon names above.
+  Values expected by Amazon::Alexa::Dispatch
+    Password
+
+  You can use any additional paramaters as needed.  So long as they do not conflict with the names above.
 
 =back
 
 =back
 
-=head2 alexa_login_helper ( $title, $blurb, $fields )
+=head2 alexa_authenticate_json ( $json )
 
-  A simple helper script to display a very trival login page to users who
-  are linking the Alexa skill on their mobile device.
+  Used by the dispatcher to grant access.
 
-=over
+  If authentication is successful this method should return a true value.
 
-=over
-
-=item $title
-
-  The title you wish to display at the top of the page.
-
-=item $blurb
-
-  A small paragraph or so of text to display below the title.
-
-=item $fields
-
-  A definition of field data to request from the user.
-
-  Example
-
-  $fields = {
-     client_id => {
-         type => 'hidden',
-         value => '123',
-     },
-     my_password_key => {
-         type => 'password',
-         value => undef, # since the customer types this in themselves
-     },
-     ......
-  };
-
-=back
-
-=back
-
-=head2 alexa_authenticate_token( $method, $token )
-
-  Used by the dispatcher to grant access.  Two arguments are passed in.
-
-  If authentication is successful this method should return the "username" that is valid
-  within your environment.
-
-  If authentication fails, this method should die.
+  If authentication fails, this method return undef or die.
 
 =over
 
 =over
 
-=item $method
+=item $json
 
-  This is the name of the action to be performed.  For example HelloIntent.
-
-=item $token
-
-  The token provided by Amazon Alexa.
+  Raw json data from Amazon.
 
 =back
 

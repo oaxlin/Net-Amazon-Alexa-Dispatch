@@ -7,6 +7,7 @@ use Time::Piece;
 use URI::Escape;
 use Clone qw{clone};
 use Tie::IxHash;
+use Throw qw{throw};
 
 my $me = 'Amazon::Alexa::Dispatch';
 my $dispatch_type; # currently CGI only
@@ -41,25 +42,32 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
   Create a new instance of Disptach.
 
+  All options can be passed into the new directly, or loaded from the "configFile"
+
 =over
 
 =over
+
+=item configFile
+
+  OPTIONAL - The path to a perl evalable config file.
 
 =item skillName
 
   The name you wish to give this Alexa skill.  Used when displaying documentation.
+
+  Defaults to "Alexa Skill" if nothing is configured.
 
 =item dispatch [array]
 
   Any additional plugins you wish to dispatch to.  If you do not include any plugins
   then this module will only be able to perform Hello requests.
 
+  Plugins added during "new" will be processed before any in a config file.
+
   If multiple plugins share the same method calls, the one listed first will be used.
 
-=item token_dispatch
-
-  By default uses the first plugin in your list.  If you wish to use a different
-  plugin for token creation/authentication then list that module here.
+  Please note all plugins must use the same token for authentication
 
 =back
 
@@ -72,332 +80,133 @@ sub new {
     my $args = shift;
     my $dispatch = $args->{'dispatch'};
     $dispatch = [$dispatch] if $dispatch && !ref $dispatch;
-    push @$dispatch, 'Amazon::Alexa::Dispatch';
+    my $config = {'Amazon::Alexa::Dispatch'=>{}};
+    if ($args->{'configFile'}) {
+        local $/;
+        open( my $fh, '<', $args->{'configFile'} );
+        my $text = <$fh>;
+        my $temp_config = eval $text; ## no critic
+        $config = $temp_config if ref $temp_config eq 'HASH' && exists $temp_config->{'Amazon::Alexa::Dispatch'};
+    }
+    $config = $args if ref $args->{'Amazon::Alexa::Dispatch'} eq 'HASH';
+    push @$dispatch, @{$config->{'Amazon::Alexa::Dispatch'}->{'dispatch'}} if ref $config->{'Amazon::Alexa::Dispatch'}->{'dispatch'} eq 'ARRAY';
     my $node = {
         configFile => $args->{'configFile'},
-        skillName => $args->{'skillName'} // 'SKILL',
-        helpPage => $args->{'helpPage'},
+        skillName => $args->{'skillName'} // $config->{'Amazon::Alexa::Dispatch'}->{'skillName'} // 'Alexa Skill',
         dispatch => $dispatch,
-        token_dispatch => $args->{'token_dispatch'} || $dispatch->[0],
+        config => $config,
     };
-    my $config = { 'Amazon::Alexa::Dispatch' => { alexa_token => 'fake'} };
-    if ($args->{'configFile'}) {
-      local $/;
-      open( my $fh, '<', $args->{'configFile'} );
-      my $json_text   = <$fh>;
-      $config = decode_json( $json_text );
-    }
-    my $self = bless $node, $class;
-    foreach my $d (@$dispatch) {
-        eval "require $d" or die $@; ## no critic
-        die "[$me] Skill plugin must support alexa_authenticate_token\n" unless $d->can('alexa_authenticate_token');
-        die "[$me] Skill plugin must support alexa_configure\n" unless $d->can('alexa_configure');
-        $config->{$d}->{'Amazon::Alexa::Dispatch'} = $self;
-        my $h = $d->alexa_configure($config->{$d});
-        die "[$me] Skill plugin must support alexa_configure\n" unless ref $h eq 'HASH' or ref $h eq $d;
-        $self->{'token_dispatch'} = $h if ref $h eq $self->{'token_dispatch'};
-        $d = {
-            %$h,
-            module => ref $h eq 'HASH' ? $d : $h,
-        };
-    }
-    foreach my $key (keys %{$config->{'Amazon::Alexa::Dispatch'}}) {
-        next if $key eq 'Amazon::Alexa::Dispatch';
-        # Allow config info to come from the json config file
-        $self->{$key} //= $config->{'Amazon::Alexa::Dispatch'}->{$key};
-    }
-    return $self;
+    return bless $node, $class;
 }
 
-sub _run_method {
+=head2 msg_to_hash
+
+  Parses the message and turns it into a hash suitable to be JSONified for Alexa
+
+=over
+
+=over
+
+=item $ret
+
+  Raw response, coulde be one of
+  1) Already existing well formatted Alexa HASH response
+  2) Simple text
+  3) Throw object
+
+  Be careful to not send die text to this method as they look just like simple text
+
+=item $default
+
+  This text will be used if the value of $ret is not safe
+
+  If no default is provided then 'Skill returned invalid response data' will be used
+
+=back
+
+=back
+
+=cut
+
+sub msg_to_hash {
+    # simple response wrapper for alexa
+    # can take a full valid hash, or a simple scalar
     my $self = shift;
-    my $json = shift;
-    my $module;
-    my $method = $json->{'request'}->{'intent'}->{'name'};
-    my $resp;
-    my $ok = eval {
-        $module = $self->_find_module($method);
-        1;
-    };
-    my $e = $@; # should only happen if they have a bad intent schema on amazon
-    $resp = $self->_msg_to_hash('Sorry, I could not find that intent for this skill.',$e) if $e || !$ok || !$module;
-    if (!$resp) {
-        $ok = eval {
-            $method = ($module->{'intentPrefix'}//'').$method;
-            $self->_authenticate_token($module,$method,$json->{'session'}->{'user'}->{'accessToken'},$json->{'request'}->{'timestamp'});
-        };
-        $e = $@;
-        $resp = $self->_msg_to_hash('Failed to authenticate.  Please use the Alexa mobile app to re link this skill.',$e) if $e || !$ok;
+    my $ret = shift;
+    my $default = shift || 'Skill returned invalid response data';
+    return $ret if ref $ret eq 'HASH'
+        && defined $ret->{'version'}
+        && defined $ret->{'sessionAttributes'}
+        && ref $ret->{'response'} eq 'HASH'
+        && ref $ret->{'response'}->{'outputSpeech'} eq 'HASH'
+        && defined $ret->{'response'}->{'outputSpeech'}->{'type'}
+        && defined $ret->{'response'}->{'outputSpeech'}->{'text'}
+        && defined $ret->{'response'}->{'shouldEndSession'};
 
-
-	my $easy_args = {}; # simplify pulling args out of the Amazon api
-	if (ref $json->{'request'} eq 'HASH'
-		&& exists $json->{'request'}->{'intent'}
-		&& ref $json->{'request'}->{'intent'} eq 'HASH'
-		&& exists $json->{'request'}->{'intent'}->{'slots'}
-	) {
-		foreach my $key (keys %{$json->{'request'}->{'intent'}->{'slots'}}) {
-			$easy_args->{$key} = $json->{'request'}->{'intent'}->{'slots'}->{$key}->{'value'};
-		}
-	}
-        $resp = $module->{'module'}->$method($easy_args,$json) unless $resp;
+    while (ref $ret eq 'HASH'
+        && scalar keys %$ret == 1
+        && exists $ret->{'error'}
+        && ((ref $ret->{'error'}) =~ /^(HASH|Throw)$/)
+    ) {
+        # catch an error stuffed into a simple hash
+        $ret = $ret->{'error'};
     }
-    $self->_print_json($resp);
-}
 
-sub _find_module {
-    my $self = shift;
-    my $method = shift;
-    foreach my $module (@{$self->{'dispatch'}}) {
-        return $module if $module->{'module'}->can(($module->{'intentPrefix'}//'').$method);
+    if (ref $ret eq 'Throw' && $ret->{'alexa_safe'}) {
+        # allow "alexa_safe" errors
+        $ret = $ret->{'error'};
     }
-    die "[$me] Unknown intent $method\n" unless $self->{'dispatch'}->[0]->{'module'}->can($method);
-}
 
-sub _print_json {
-    my $self = shift;
-    my $data = shift;
-    my $jsonp = JSON::XS->new;
-    $jsonp->pretty(1);
-    my $pretty_json = $jsonp->encode($self->_msg_to_hash($data));
-    print "Content-Type:text/plain;charset=UTF-8\n\n",$pretty_json;
-}
+    if (ref $ret) {
+        # only very specific refs are allowed
+        require Data::Dumper;
+        warn "Invalid object response", eval{Data::Dumper::Dumper $ret;};
+        $ret = $default;
+    }
 
-sub _msg_to_hash {
-    my $self = shift;
-    my $msg = shift;
-    my $e = shift;
-    warn $e if $e;
-    return $msg if ref $msg eq 'HASH';
     return {
         version => '1.0',
         sessionAttributes=>{},
         response=>{
             outputSpeech => {
                 type => 'PlainText',
-                text => "$msg",
+                text => "$ret",
             },
             shouldEndSession => JSON::true,
         },
     };
 }
 
-sub _authenticate_token {
+sub _find_module {
+    # loops through all dispatch modules looking for a method match
     my $self = shift;
-    my $module = shift;
     my $method = shift;
-    my $p = shift;
-    my $t = shift || die "[$me] Missing request timestamp, try again later\n";
-    $t =~ s/Z$/ +0000/;
-    my $dateformat = '%Y-%m-%dT%H:%M:%S %z';
-    my $date1 = eval{ Time::Piece->strptime($t, $dateformat)} || die "[$me] Invalid request timestamp, try again later\n";
-    my $d_txt = `/bin/date +'$dateformat'`;
-    chomp($d_txt);
-    my $date2 = eval{ Time::Piece->strptime($d_txt, $dateformat) } || die "[$me] Could not read local time, try again later\n";
-    die "[$me] Request too old, try again later\n" if abs($date1->strftime('%s') - $date2->strftime('%s')) > 500;
-    $self->{'user'} = $module->{'module'}->alexa_authenticate_token($method,$p);
-    die "[$me] Please open the Alexa $self->{'skillName'} skill to re link your account, then try again.\n" unless $self->{'user'};
-    1;
-}
-
-=head2 dispatch_CGI
-
-  Handles processing of calls in an apache or mod_perl environment.
-
-  Can handle 3 types of calls
-    1) Linking your Alexa skill
-    2) Displaying a generic help page
-    3) Processing an alexa skill request
-
-=over
-
-=over
-
-=item helpPage
-
-  Valid values are
-    1) full - (default) displays a large help page.  Useful to for setting up your skill
-    2) none - simply displays an empty HTML page.
-    3) partial - (TODO) A simple blurb about your skill
-
-  New users will likely want assistance with the "full" setting.  However once you have
-  configured your alexa skill we recommend setting helpPage to "none" or "partial"
-
-  Note: can also be set in the JSON config file
-
-=back
-
-=back
-
-=cut
-
-sub dispatch_CGI {
-    my $self = shift;
-    my $args = shift;
-    $dispatch_type = 'CGI';
-    require CGI;
-    my $cgi = CGI->new;
-    my $json_raw = $cgi->param('POSTDATA');
-    if ($cgi->param('response_type') && $cgi->param('response_type') eq 'token'
-        && $cgi->param('redirect_uri')
-        && $cgi->param('state')
-        && $cgi->param('client_id')
-    ) {
-        my $uri = $cgi->param('redirect_uri');
-        my $state = $cgi->param('state');
-        my $params = {$cgi->Vars};
-        my $token = $self->{'token_dispatch'}->alexa_create_token( $params );
-        if ($token) {
-            my $full = $uri.'#token_type=Bearer&access_token='.uri_escape($token).'&state='.uri_escape($state);
-            print &CGI::header(-'status'=>302,-'location'=>$full,-'charset'=>'UTF-8',-'Pragma'=>'no-cache',-'Expires'=>'-2d');
-            print "Content-Type:text/html\n\nAlexa Link Created";
-        } else {
-            # no token was created.  hopefully they displayed some sort of login page as part of the alexa_create_token call
-        }
-    } elsif ($json_raw) {
-        my $json_data= eval { decode_json($json_raw); };
-        $self->_run_method($json_data);
-    } elsif (($args->{'helpPage'}//$self->{'helpPage'}//'') eq 'none') {
-        print "Content-Type:text/html\n\n";
-    } else {
-        print "Content-Type:text/html\n\n";
-        if (!$self->{'token_dispatch'}->can('alexa_create_token')) {
-            print '<font color=red>WARNING</font>: Your skill does not support auto-linking with alexa.  Missing "alexa_create_token" method.<br>';
-        }
-        print '<h1>Contents:</h1><ol>
-<li><a href="#schema">Amazon Developer Login</a>
-<li><a href="#schema">Intent Schema</a>
-<li><a href="#slots">Custom Slot Types</a>
-<li><a href="#utterances">Sample Utterances</a>
-<li><a href="#intents">Intents</a>
-<li><a href="?response_type=token&redirect_uri=fake&state=fake&client_id=fake">Alexa Link Page</a>
-</ol>
-You can configure your skill with the following data<br>';
-
-        my $methodList = {};
-        foreach my $module (@{$self->{'dispatch'}}) {
-            my $m = quotemeta($module->{'intentPrefix'}//'');
-            if ($m) {
-                no strict 'refs'; ## no critic
-                my $mname = ref $module->{'module'} // $module->{'module'};
-                my @methods = grep { $_ =~ /^$m/ && $_ !~ /__meta$/ && $module->{'module'}->can($_) } sort keys %{$mname.'::'};
-                use strict 'refs';
-                foreach my $method (@methods) {
-                    my $intent = $method;
-                    my $meta = $method.'__meta';
-                    $intent =~ s/^$m//;
-                    $method = {method=>$method,intent=>$intent};
-                    $method->{'meta'} = $module->{'module'}->$meta() if $module->{'module'}->can($meta);
-                }
-                $methodList->{$module->{'module'}} = \@methods;
-            } else {
-                $methodList->{$module->{'module'}} = [{errors=>"intentPrefix must exist to list methods"}];
-            }
-        }
-
-        my $custom_slots = {};
-        print '<a name="schema"><h1>Amazon Developer Login:</h1><a href="https://www.amazon.com/ap/signin">https://www.amazon.com/ap/signin</a>';
-        print '<a name="schema"><h1>Intent Schema:</h1><textarea wrap=off cols=100 rows=10>{"intents": ['."\n";
-        my $out = '';
-        foreach my $m (sort keys %$methodList) {
-            foreach my $i (@{$methodList->{$m}}) {
-                tie(my %myhash, 'Tie::IxHash', 'intent' => $i->{'intent'}); # super annoying when the intent isn't first
-                my $schema = \%myhash;
-
-                if ($i->{'meta'}->{'slots'}) {
-                    $schema->{'slots'} = clone $i->{'meta'}->{'slots'};
-                    foreach my $slot (@{$schema->{'slots'}}) {
-                        $custom_slots->{$slot->{'name'}} = $slot->{'values'};
-                        delete $slot->{'values'}; # intent schema doesn't want this
-                    }
-                }
-                $out .= &CGI::escapeHTML('    '.to_json($schema).",\n");
-            }
-        };
-        chop($out);chop($out);
-        print $out."\n  ]\n}</textarea><br>";
-
-        print '<a name="slots"><h1>Custom Slot Types:</h1>';
-        if (!scalar keys %$custom_slots) {
-            print 'There are not custom slot types.';
-        } else {
-            print '<table cellpadding=3>';
-            print '<tr><th></th><th>Type</th><th></th><th>Values</th></tr>';
-            print "<script>function alexa_copy(id) {
-                document.getElementById('copyarea').innerHTML = document.getElementById(id).innerHTML;
-                document.getElementById('copyarea').style.display = '';
-                document.getElementById('copyarea').select();
-                document.execCommand('copy');
-            }</script>";
-
-            my $id;
-            foreach my $name (sort keys %$custom_slots) {
-                if (ref $custom_slots->{$name}) {
-                    $id++;
-                    my $n = 'copyarea'.$id;
-                    print '<tr><td><a href="javascript:alexa_copy(\''.$n.'\');">Show</a></td>';
-                    print '<td>'.&CGI::escapeHTML($name).'</td><td>-</td>';
-                    my $v = join ' | ', @{$custom_slots->{$name}};
-                    $v = substr($v,0,200).'...' if length $v > 200;
-                    print '<td>'.&CGI::escapeHTML($v).'<textarea style="display:none" id='.$n.'>'
-                        .&CGI::escapeHTML(join "\n", @{$custom_slots->{$name}}).'</textarea></td>';
-                    print '</tr>';
-                }
-            }
-            print '</table><textarea id=copyarea style="display:none" cols=100 rows=5></textarea>';
-        }
-
-
-        print '<a name="utterances"><h1>Sample Utternaces:</h1><textarea cols=100 rows=10>';
-        foreach my $m (sort keys %$methodList) {
-            foreach my $i (@{$methodList->{$m}}) {
-                foreach my $u (@{$i->{'meta'}->{'utterances'}}) {
-                    print &CGI::escapeHTML($i->{'intent'}.' '.$u)."\n";
-                }
-            }
-        };
-        print '</textarea><br>';
-
-        print '<a name="intents"><h1>Intents:</h1>';
-        foreach my $m (sort keys %$methodList) {
-            foreach my $i (@{$methodList->{$m}}) {
-                print '<h2>'.&CGI::escapeHTML($i->{'intent'}).'</h2>Interaction:<ul>';
-                foreach my $u (@{$i->{'meta'}->{'utterances'}}) {
-                    print '<li>Alexa tell '.&CGI::escapeHTML($self->{'skillName'}).' to '.$u;
-                }
-                print '</ul>';
-            }
-        };
+    foreach my $module (@{$self->{'dispatch'}}) {
+        eval "require $module" or throw "Skill plugin $module not found", { ## no critic
+                                      cause => $@,
+                                      alexa_safe => 1,
+                                  }; ## no critic
+        my $prefix = eval{ $module->intent_prefix } // '';
+        my $full_method = $prefix.$method;
+        return ($module,$full_method) if $module->can($full_method);
     }
+    throw "Unknown intent $method", {
+        cause => 'Not found in dispatcher path',
+        alexa_safe => 1,
+    };
 }
 
-=head2 alexa_configure ( $config )
+=head2 run_method
 
-  All dispatch plugins should have this method.  It's used by the new plugin to configure
-  the dispatcher.
-
-=over
+  Parses the Amazon data and routes it to the appropriate module/method.
 
 =over
 
-=item $config
-
-  A hash containing config data meant for your plugin.  This can come from a config
-  file, or be hard coded into your script.
-
-  Plugins can define their own configuration needs.
-
 =over
 
-=item intentPrefix
+=item $json
 
-  Recommended value is alexa_intent_, but anything can be used.
-
-  This value will be prepended to all intent requests coming from Alexa.  For example
-  if you have an intent called HelloIntent then the distpacher would look for a method
-  similar to Amazon::Alexa::Plugin->alexa_intent_HelloIntent()
-
-=back
+  Raw json data from Amazon.
 
 =back
 
@@ -405,17 +214,59 @@ You can configure your skill with the following data<br>';
 
 =cut
 
-sub alexa_configure {
-    my $class = shift;
-    my $self = shift->{'Amazon::Alexa::Dispatch'};
-    $self->{'intentPrefix'} = 'alexa_intent_';
-    $self;
+sub run_method {
+    my ($self, $json) = @_;
+
+    # this really should be run well before a run_method is called
+    # but just in case it wasn't we run it here
+    $self->alexa_authenticate_json($json);
+
+    my $ret = eval {
+        my $method = $json->{'request'}->{'intent'}->{'name'};
+        my ($module,$full_method) = $self->_find_module($method);
+
+        my $module_config = $self->{'config'}->{$module};
+        my $obj = eval{ $module->new($module_config); } or throw "Skill plugin could not be initialized", {
+                                                               cause => $@,
+                                                               alexa_safe => 1,
+                                                           };
+        $obj->$full_method($json);
+    };
+    my $e = $@;
+    if ($e) {
+        warn $e;
+        $ret = { error => $e };
+    }
+    return $self->msg_to_hash($ret);
 }
 
-=head2 alexa_create_token ( $param )
+=head2 intent_prefix
 
-  Should return nothing if no token was created.  Any other value will be assumed to
-  be the token to send back to Amazon.
+  Simply returns the intent_prefix value used by this module
+
+=cut
+
+sub intent_prefix { return 'alexa_intent_' }
+
+=head2 skill_name
+
+  Simply returns the value configured in Config->skillName
+
+  Defaults to "Alexa Skill" if nothing is configured.
+
+=cut
+
+sub skill_name {
+    return shift->{'skillName'} // "Alexa Skill";
+}
+
+=head2 alexa_authenticate_params ( $param )
+
+  Used by the dispatcher to grant access.
+
+  If authentication is successful this method should return the token.
+
+  If authentication fails, this method return undef or die.
 
 =over
 
@@ -431,8 +282,10 @@ sub alexa_configure {
     state
     client_id
 
-  You can use any additional paramaters as needed.  So long as they do not conflict with the
-  four amazon names above.
+  Values expected by Amazon::Alexa::Dispatch
+    Password
+
+  You can use any additional paramaters as needed.  So long as they do not conflict with the names above.
 
 =back
 
@@ -440,50 +293,33 @@ sub alexa_configure {
 
 =cut
 
-sub alexa_create_token {
+sub alexa_authenticate_params {
     my ($self,$param) = @_;
-    return 'fake' if ($param->{'Password'} && $param->{'Password'} eq 'fake');
-    my $fields = {};
-    $fields->{$_} = { type=>'hidden', value=> $param->{$_} } foreach keys %$param;
-    $fields->{'Password'} = { type=>'password' };
-    $self->alexa_login_helper( 'Fake Alexa Login','Please type "fake" into the password field.', $fields );
-    return '';
+    # TODO use something better than the password as a token
+    my $token = $self->{'config'}->{'Amazon::Alexa::Dispatch'}->{'alexa_token'};
+    throw "No token configured in Config->Amazon::Alexa::Dispatch->alexa_token", {
+        cause => "Token not found",
+        alexa_safe => 1,
+    } unless defined $token;
+    return $token if $token eq ($param->{'Password'}//'');
+    return undef;
 }
 
-=head2 alexa_login_helper ( $title, $blurb, $fields )
+=head2 alexa_authenticate_json ( $json )
 
-  A simple helper script to display a very trival login page to users who
-  are linking the Alexa skill on their mobile device.
+  Used by the dispatcher to grant access.
+
+  If authentication is successful this method should return a true value.
+
+  If authentication fails, this method return undef or die.
 
 =over
 
 =over
 
-=item $title
+=item $json
 
-  The title you wish to display at the top of the page.
-
-=item $blurb
-
-  A small paragraph or so of text to display below the title.
-
-=item $fields
-
-  A definition of field data to request from the user.
-
-  Example
-
-  $fields = {
-     client_id => {
-         type => 'hidden',
-         value => '123',
-     },
-     my_password_key => {
-         type => 'password',
-         value => undef, # since the customer types this in themselves
-     },
-     ......
-  };
+  Raw json data from Amazon.
 
 =back
 
@@ -491,60 +327,48 @@ sub alexa_create_token {
 
 =cut
 
-sub alexa_login_helper {
-    my $self = shift;
-    $self->_alexa_login_helper_CGI(@_) if $dispatch_type eq 'CGI';
-}
+sub alexa_authenticate_json {
+    my ($self, $json) = @_;
+    my $method = $json->{'request'}->{'intent'}->{'name'};
+    my $token = $json->{'session'}->{'user'}->{'accessToken'};
 
-sub _alexa_login_helper_CGI {
-    my ($self, $title, $blurb, $fields) = @_;
-    print "Content-Type:text/html\n\n<html><head><title>".&CGI::escapeHTML($title)."</title></head><body>";
-    print '<h1>'.&CGI::escapeHTML($title).'</h1>';
-    print &CGI::escapeHTML($blurb).'<br><br><form><table>';
-    foreach my $field (keys %$fields) {
-        if ($fields->{$field}->{'type'} eq 'password') {
-            print '<tr><td>'.&CGI::escapeHTML($field).'</td><td><input type=password name="'.&CGI::escapeHTML($field).'"></td></tr>';
-        } elsif ($fields->{$field}->{'type'} eq 'hidden') {
-            print '<input type=hidden name="'.&CGI::escapeHTML($field).'" value="'.&CGI::escapeHTML($fields->{$field}->{'value'}).'"></td></tr>';
-        } else {
-            print '<tr><td>x</td><td>x</td></tr>';
-        }
-    }
-    print '<tr><td colspan=2 align=center><br><input type=submit></td></tr>';
-    print '</form></table></body></html>';
-}
+    my $t = $json->{'request'}->{'timestamp'} || throw "Missing request timestamp, try again", {
+                                                    cause => "Missing timestamp from json request",
+                                                    alexa_safe => 1,
+                                                 };
+    $t =~ s/Z$/ +0000/;
 
-=head2 alexa_authenticate_token( $method, $token )
+    my $dateformat = '%Y-%m-%dT%H:%M:%S %z';
+    my $date1 = eval{ Time::Piece->strptime($t, $dateformat)} || throw "Invalid request timestamp, try again", {
+                                                                     cause => "Malformed timestamp",
+                                                                     timestamp => $t,
+                                                                     alexa_safe => 1,
+                                                                 };
+    my $d_txt = `/bin/date +'$dateformat'`;
+    chomp($d_txt);
+    my $date2 = eval{ Time::Piece->strptime($d_txt, $dateformat) } || throw "Could not read local time, try again", {
+                                                                          cause => "Malformed timestamp",
+                                                                          timestamp => $d_txt,
+                                                                          alexa_safe => 1,
+                                                                      };
+    throw "Request too old, try again", {
+        cause => "Timestamp out of range",
+        timestamp1 => $t,
+        timestamp2 => $d_txt,
+        alexa_safe => 1,
+    } if abs($date1->strftime('%s') - $date2->strftime('%s')) > ($self->{'config'}->{'Amazon::Alexa::Dispatch'}->{'max_token_age'} // 500);
 
-  Used by the dispatcher to grant access.  Two arguments are passed in.
-
-  If authentication is successful this method should return the "username" that is valid
-  within your environment.
-
-  If authentication fails, this method should die.
-
-=over
-
-=over
-
-=item $method
-
-  This is the name of the action to be performed.  For example HelloIntent.
-
-=item $token
-
-  The token provided by Amazon Alexa.
-
-=back
-
-=back
-
-=cut
-
-sub alexa_authenticate_token {
-    my ($class, $method, $p) = @_;
-    return 'nobody' if $p eq 'fake' && $method eq 'alexa_intent_HelloIntent';
-    return '';
+    # TODO use something better than the password as a token
+    my $dispatcher_token = $self->{'config'}->{'Amazon::Alexa::Dispatch'}->{'alexa_token'};
+    throw "No token configured in Config->Amazon::Alexa::Dispatch->alexa_token", {
+        cause => 'Missing alexa_token',
+        alexa_safe => 1,
+    } unless defined $dispatcher_token;
+    throw "Please open the Alexa skill from your phone to re link your account, then try again", {
+        cause => 'token mismatch',
+        alexa_safe => 1,
+    } unless $token eq $dispatcher_token;
+    1;
 }
 
 =head2 alexa_intent_HelloIntent( $args, $json )
@@ -575,7 +399,7 @@ sub alexa_authenticate_token {
 
 sub alexa_intent_HelloIntent {
     my ($class, $args, $json) = @_;
-    return "Alexa dispatcher says hello\n";
+    return "Alexa dispatcher says hello";
 }
 
 =head2 alexa_intent_HelloIntent__meta

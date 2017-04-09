@@ -84,13 +84,15 @@ Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
   Raw response, coulde be one of
   1) Already existing well formatted Alexa HASH response
   2) Simple text
-  3) Throw object
+  3) Throw object, with alexa_safe=>1 set
 
-  Be careful to not send die text to this method as they look just like simple text
+  Be careful to not send die text to this method as they look just like simple text.  A good way to "escape" die messages is to return them like this
+
+  return { error => $@ } if $@;
 
 =item $default
 
-  This text will be used if the value of $ret is not safe
+  This text will be used if the value of $ret does not fit the above criteria
 
   If no default is provided then 'Skill returned invalid response data' will be used
 

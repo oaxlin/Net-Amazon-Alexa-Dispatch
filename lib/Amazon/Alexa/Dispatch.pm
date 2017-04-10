@@ -165,6 +165,7 @@ sub run_method {
 =head2 intent_prefix
 
 Simply returns the intent_prefix value used by this module
+The default is "alexa_intent_"
 
 Without intent_prefix all methods in a module will be exposed.  Setting this
 value will expose only methods that begin with the prefix

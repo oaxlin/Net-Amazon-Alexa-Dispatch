@@ -147,8 +147,7 @@ sub run_method {
         my $method = $json->{'request'}->{'intent'}->{'name'};
         my ($module,$full_method) = $self->_find_module($method);
 
-        my $module_config = $self->{'config'}->{$module};
-        my $obj = eval{ $module->new($module_config); } or throw "Skill plugin could not be initialized", {
+        my $obj = eval{ $module->new($self->{'config'}); } or throw "Skill plugin could not be initialized", {
                                                                cause => $@,
                                                                alexa_safe => 1,
                                                            };

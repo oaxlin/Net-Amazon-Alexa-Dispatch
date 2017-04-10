@@ -438,10 +438,10 @@ If your JSON looks something like this
           }
         }
       }
-    },
+    }
   }
 
-Then this will return a hash containing
+Then $self->slots_to_hash($json) will return a hash containing
 
   {
     "bravia_location" => "upstairs",

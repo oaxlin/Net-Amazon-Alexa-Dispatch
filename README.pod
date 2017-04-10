@@ -182,16 +182,11 @@ Raw json data from Amazon.
 
 =head2 alexa_intent_HelloIntent( $args, $json )
 
-A sample intent action that an Alexa skill can perform.  All skills will be passed
-two values.
+A sample intent action that an Alexa skill can perform.
 
 =over
 
 =over
-
-=item $args
-
-A simple hash containing all the "slot" data from Amazon.
 
 =item $json
 
@@ -209,6 +204,33 @@ skill request.
 Basic meta information about your skill.  This will be used by the automatic
 documentation to make it easier for others to create their own skills using your
 plugin
+
+=head2 slots_to_hash
+
+Takes in the Alexa $json data and returns a simple hash with key/value pairs
+
+If your JSON looks something like this
+
+  {
+    "request": {
+      "type": "IntentRequest",
+      "intent": {
+        "name": "HelloIntent",
+        "slots": {
+          "bravia_location": {
+            "name": "bravia_location",
+            "value": "upstairs"
+          }
+        }
+      }
+    },
+  }
+
+Then this will return a hash containing
+
+  {
+    "bravia_location" => "upstairs",
+  }
 
 =head1 AUTHOR
 

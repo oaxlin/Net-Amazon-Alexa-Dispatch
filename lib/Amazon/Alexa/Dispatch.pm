@@ -378,16 +378,11 @@ sub alexa_authenticate_json {
 
 =head2 alexa_intent_HelloIntent( $args, $json )
 
-A sample intent action that an Alexa skill can perform.  All skills will be passed
-two values.
+A sample intent action that an Alexa skill can perform.
 
 =over
 
 =over
-
-=item $args
-
-A simple hash containing all the "slot" data from Amazon.
 
 =item $json
 
@@ -403,7 +398,8 @@ skill request.
 =cut
 
 sub alexa_intent_HelloIntent {
-    my ($class, $args, $json) = @_;
+    my ($self, $json) = @_;
+    my $nvp = $self->slots_to_hash($json); # not really needed, but good for example purposes
     return "Alexa dispatcher says hello";
 }
 
@@ -422,6 +418,50 @@ sub alexa_intent_HelloIntent__meta {
         ],
         # slots => [{name=>"someName",type=>"AMAZON.NUMBER"},{name=>"anotherName",type=>"customName",values=>[1,2,3]}]
     }
+}
+
+=head2 slots_to_hash
+
+Takes in the Alexa $json data and returns a simple hash with key/value pairs
+
+If your JSON looks something like this
+
+  {
+    "request": {
+      "type": "IntentRequest",
+      "intent": {
+        "name": "HelloIntent",
+        "slots": {
+          "bravia_location": {
+            "name": "bravia_location",
+            "value": "upstairs"
+          }
+        }
+      }
+    },
+  }
+
+Then this will return a hash containing
+
+  {
+    "bravia_location" => "upstairs",
+  }
+
+=cut
+
+sub slots_to_hash {
+    my ($self, $json) = @_;
+    my $easy_args = {}; # simplify pulling args out of the Amazon api
+    if (ref $json->{'request'} eq 'HASH'
+        && exists $json->{'request'}->{'intent'}
+        && ref $json->{'request'}->{'intent'} eq 'HASH'
+        && exists $json->{'request'}->{'intent'}->{'slots'}
+    ) {
+        foreach my $key (keys %{$json->{'request'}->{'intent'}->{'slots'}}) {
+            $easy_args->{$key} = $json->{'request'}->{'intent'}->{'slots'}->{$key}->{'value'};
+        }
+    }
+    return $easy_args;
 }
 
 1;

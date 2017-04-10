@@ -99,89 +99,6 @@ sub new {
     return bless $node, $class;
 }
 
-=head2 msg_to_hash
-
-Parses the message and turns it into a hash suitable to be JSONified for Alexa
-
-=over
-
-=over
-
-=item $ret
-
-Raw response, coulde be one of
-
-  1) Already existing well formatted Alexa HASH response
-
-  2) Simple text
-
-  3) Throw object, with alexa_safe=>1 set
-
-Be careful to not send die text to this method as they look just like simple text.  A good way to "escape" die messages is to return them like this
-
-  return { error => $@ } if $@;
-
-=item $default
-
-This text will be used if the value of $ret does not fit the above criteria
-
-If no default is provided then 'Skill returned invalid response data' will be used
-
-=back
-
-=back
-
-=cut
-
-sub msg_to_hash {
-    # simple response wrapper for alexa
-    # can take a full valid hash, or a simple scalar
-    my $self = shift;
-    my $ret = shift;
-    my $default = shift || 'Skill returned invalid response data';
-    return $ret if ref $ret eq 'HASH'
-        && defined $ret->{'version'}
-        && defined $ret->{'sessionAttributes'}
-        && ref $ret->{'response'} eq 'HASH'
-        && ref $ret->{'response'}->{'outputSpeech'} eq 'HASH'
-        && defined $ret->{'response'}->{'outputSpeech'}->{'type'}
-        && defined $ret->{'response'}->{'outputSpeech'}->{'text'}
-        && defined $ret->{'response'}->{'shouldEndSession'};
-
-    while (ref $ret eq 'HASH'
-        && scalar keys %$ret == 1
-        && exists $ret->{'error'}
-        && ((ref $ret->{'error'}) =~ /^(HASH|Throw)$/)
-    ) {
-        # catch an error stuffed into a simple hash
-        $ret = $ret->{'error'};
-    }
-
-    if (ref $ret eq 'Throw' && $ret->{'alexa_safe'}) {
-        # allow "alexa_safe" errors
-        $ret = $ret->{'error'};
-    }
-
-    if (ref $ret) {
-        # only very specific refs are allowed
-        require Data::Dumper;
-        warn "Invalid object response", eval{Data::Dumper::Dumper $ret;};
-        $ret = $default;
-    }
-
-    return {
-        version => '1.0',
-        sessionAttributes=>{},
-        response=>{
-            outputSpeech => {
-                type => 'PlainText',
-                text => "$ret",
-            },
-            shouldEndSession => JSON::true,
-        },
-    };
-}
-
 sub _find_module {
     # loops through all dispatch modules looking for a method match
     my $self = shift;
@@ -248,6 +165,9 @@ sub run_method {
 =head2 intent_prefix
 
 Simply returns the intent_prefix value used by this module
+
+Without intent_prefix all methods in a module will be exposed.  Setting this
+value will expose only methods that begin with the prefix
 
 =cut
 
@@ -462,6 +382,89 @@ sub slots_to_hash {
         }
     }
     return $easy_args;
+}
+
+=head2 msg_to_hash
+
+Parses the message and turns it into a hash suitable to be JSONified for Alexa
+
+=over
+
+=over
+
+=item $ret
+
+Raw response, coulde be one of
+
+  1) Already existing well formatted Alexa HASH response
+
+  2) Simple text
+
+  3) Throw object, with alexa_safe=>1 set
+
+Be careful to not send die text to this method as they look just like simple text.  A good way to "escape" die messages is to return them like this
+
+  return { error => $@ } if $@;
+
+=item $default
+
+This text will be used if the value of $ret does not fit the above criteria
+
+If no default is provided then 'Skill returned invalid response data' will be used
+
+=back
+
+=back
+
+=cut
+
+sub msg_to_hash {
+    # simple response wrapper for alexa
+    # can take a full valid hash, or a simple scalar
+    my $self = shift;
+    my $ret = shift;
+    my $default = shift || 'Skill returned invalid response data';
+    return $ret if ref $ret eq 'HASH'
+        && defined $ret->{'version'}
+        && defined $ret->{'sessionAttributes'}
+        && ref $ret->{'response'} eq 'HASH'
+        && ref $ret->{'response'}->{'outputSpeech'} eq 'HASH'
+        && defined $ret->{'response'}->{'outputSpeech'}->{'type'}
+        && defined $ret->{'response'}->{'outputSpeech'}->{'text'}
+        && defined $ret->{'response'}->{'shouldEndSession'};
+
+    while (ref $ret eq 'HASH'
+        && scalar keys %$ret == 1
+        && exists $ret->{'error'}
+        && ((ref $ret->{'error'}) =~ /^(HASH|Throw)$/)
+    ) {
+        # catch an error stuffed into a simple hash
+        $ret = $ret->{'error'};
+    }
+
+    if (ref $ret eq 'Throw' && $ret->{'alexa_safe'}) {
+        # allow "alexa_safe" errors
+        $ret = $ret->{'error'};
+    }
+
+    if (ref $ret) {
+        # only very specific refs are allowed
+        require Data::Dumper;
+        warn "Invalid object response", eval{Data::Dumper::Dumper $ret;};
+        $ret = $default;
+    }
+
+    return {
+        version => '1.0',
+        sessionAttributes=>{},
+        response=>{
+            outputSpeech => {
+                type => 'PlainText',
+                text => "$ret",
+            },
+            shouldEndSession => JSON::true,
+        },
+    };
 }
 
 1;

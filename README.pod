@@ -71,38 +71,6 @@ Please note all plugins must use the same token for authentication
 
 =back
 
-=head2 msg_to_hash
-
-Parses the message and turns it into a hash suitable to be JSONified for Alexa
-
-=over
-
-=over
-
-=item $ret
-
-Raw response, coulde be one of
-
-  1) Already existing well formatted Alexa HASH response
-
-  2) Simple text
-
-  3) Throw object, with alexa_safe=>1 set
-
-Be careful to not send die text to this method as they look just like simple text.  A good way to "escape" die messages is to return them like this
-
-  return { error => $@ } if $@;
-
-=item $default
-
-This text will be used if the value of $ret does not fit the above criteria
-
-If no default is provided then 'Skill returned invalid response data' will be used
-
-=back
-
-=back
-
 =head2 run_method
 
 Parses the Amazon data and routes it to the appropriate module/method.
@@ -122,6 +90,9 @@ Raw json data from Amazon.
 =head2 intent_prefix
 
 Simply returns the intent_prefix value used by this module
+
+Without intent_prefix all methods in a module will be exposed.  Setting this
+value will expose only methods that begin with the prefix
 
 =head2 skill_name
 
@@ -231,6 +202,38 @@ Then $self->slots_to_hash($json) will return a hash containing
   {
     "bravia_location" => "upstairs",
   }
+
+=head2 msg_to_hash
+
+Parses the message and turns it into a hash suitable to be JSONified for Alexa
+
+=over
+
+=over
+
+=item $ret
+
+Raw response, coulde be one of
+
+  1) Already existing well formatted Alexa HASH response
+
+  2) Simple text
+
+  3) Throw object, with alexa_safe=>1 set
+
+Be careful to not send die text to this method as they look just like simple text.  A good way to "escape" die messages is to return them like this
+
+  return { error => $@ } if $@;
+
+=item $default
+
+This text will be used if the value of $ret does not fit the above criteria
+
+If no default is provided then 'Skill returned invalid response data' will be used
+
+=back
+
+=back
 
 =head1 AUTHOR
 

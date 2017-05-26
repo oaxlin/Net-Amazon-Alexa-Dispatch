@@ -4,7 +4,7 @@
 
 =head1 NAME
 
-Amazon::Alexa::Dispatch
+Net::Amazon::Alexa::Dispatch
 
 =head1 VERSION
 
@@ -12,14 +12,14 @@ version 0.001
 
 =head1 SYNOPSIS
 
-  use Amazon::Alexa::Dispatch;
+  use Net::Amazon::Alexa::Dispatch;
 
-  my $alexa = Amazon::Alexa::Dispatch->new({
+  my $alexa = Net::Amazon::Alexa::Dispatch->new({
       skillName=>'YourSkillName',
       configFile=>'/home/oaxlin/config_alexa.json',
       dispatch=>[
-          'Amazon::Alexa::SomePlugin',
-          'Amazon::Alexa::AnotherPlugin'
+          'Net::Amazon::Alexa::SomePlugin',
+          'Net::Amazon::Alexa::AnotherPlugin'
       ],
     });
   $alexa->run_method($json);
@@ -31,7 +31,7 @@ Alexa Skills Kit
 
 =head1 NAME
 
-Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
+Net::Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
 =head1 METHODS
 
@@ -123,7 +123,7 @@ Values provided by Amazon include
   state
   client_id
 
-Values expected by Amazon::Alexa::Dispatch
+Values expected by Net::Amazon::Alexa::Dispatch
   Password
 
 You can use any additional paramaters as needed.  So long as they do not conflict with the names above.

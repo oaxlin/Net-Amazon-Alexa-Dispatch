@@ -1,31 +1,29 @@
-package Amazon::Alexa::Dispatch;
+package Net::Amazon::Alexa::Dispatch;
 use strict;
 use warnings;
 use JSON;
 use Net::OAuth2;
 use Time::Piece;
 use URI::Escape;
-use Clone qw{clone};
-use Tie::IxHash;
 use Throw qw{throw};
 
-my $me = 'Amazon::Alexa::Dispatch';
+my $me = 'Net::Amazon::Alexa::Dispatch';
 my $dispatch_type; # currently CGI only
 
 =head1 NAME
 
-Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
+Net::Amazon::Alexa::Dispatch - Perl extensions for creating an Alexa skill
 
 =head1 SYNOPSIS
 
-  use Amazon::Alexa::Dispatch;
+  use Net::Amazon::Alexa::Dispatch;
 
-  my $alexa = Amazon::Alexa::Dispatch->new({
+  my $alexa = Net::Amazon::Alexa::Dispatch->new({
       skillName=>'YourSkillName',
       configFile=>'/home/oaxlin/config_alexa.json',
       dispatch=>[
-          'Amazon::Alexa::SomePlugin',
-          'Amazon::Alexa::AnotherPlugin'
+          'Net::Amazon::Alexa::SomePlugin',
+          'Net::Amazon::Alexa::AnotherPlugin'
       ],
     });
   $alexa->run_method($json);
@@ -80,19 +78,19 @@ sub new {
     my $args = shift;
     my $dispatch = $args->{'dispatch'};
     $dispatch = [$dispatch] if $dispatch && !ref $dispatch;
-    my $config = {'Amazon::Alexa::Dispatch'=>{}};
+    my $config = {'Net::Amazon::Alexa::Dispatch'=>{}};
     if ($args->{'configFile'}) {
         local $/;
         open( my $fh, '<', $args->{'configFile'} );
         my $text = <$fh>;
         my $temp_config = eval $text; ## no critic
-        $config = $temp_config if ref $temp_config eq 'HASH' && exists $temp_config->{'Amazon::Alexa::Dispatch'};
+        $config = $temp_config if ref $temp_config eq 'HASH' && exists $temp_config->{'Net::Amazon::Alexa::Dispatch'};
     }
-    $config = $args if ref $args->{'Amazon::Alexa::Dispatch'} eq 'HASH';
-    push @$dispatch, @{$config->{'Amazon::Alexa::Dispatch'}->{'dispatch'}} if ref $config->{'Amazon::Alexa::Dispatch'}->{'dispatch'} eq 'ARRAY';
+    $config = $args if ref $args->{'Net::Amazon::Alexa::Dispatch'} eq 'HASH';
+    push @$dispatch, @{$config->{'Net::Amazon::Alexa::Dispatch'}->{'dispatch'}} if ref $config->{'Net::Amazon::Alexa::Dispatch'}->{'dispatch'} eq 'ARRAY';
     my $node = {
         configFile => $args->{'configFile'},
-        skillName => $args->{'skillName'} // $config->{'Amazon::Alexa::Dispatch'}->{'skillName'} // 'Alexa Skill',
+        skillName => $args->{'skillName'} // $config->{'Net::Amazon::Alexa::Dispatch'}->{'skillName'} // 'Alexa Skill',
         dispatch => $dispatch,
         config => $config,
     };
@@ -207,7 +205,7 @@ Values provided by Amazon include
   state
   client_id
 
-Values expected by Amazon::Alexa::Dispatch
+Values expected by Net::Amazon::Alexa::Dispatch
   Password
 
 You can use any additional paramaters as needed.  So long as they do not conflict with the names above.
@@ -221,8 +219,8 @@ You can use any additional paramaters as needed.  So long as they do not conflic
 sub alexa_authenticate_params {
     my ($self,$param) = @_;
     # TODO use something better than the password as a token
-    my $token = $self->{'config'}->{'Amazon::Alexa::Dispatch'}->{'alexa_token'};
-    throw "No token configured in Config->Amazon::Alexa::Dispatch->alexa_token", {
+    my $token = $self->{'config'}->{'Net::Amazon::Alexa::Dispatch'}->{'alexa_token'};
+    throw "No token configured in Config->Net::Amazon::Alexa::Dispatch->alexa_token", {
         cause => "Token not found",
         alexa_safe => 1,
     } unless defined $token;
@@ -281,11 +279,11 @@ sub alexa_authenticate_json {
         timestamp1 => $t,
         timestamp2 => $d_txt,
         alexa_safe => 1,
-    } if abs($date1->strftime('%s') - $date2->strftime('%s')) > ($self->{'config'}->{'Amazon::Alexa::Dispatch'}->{'max_token_age'} // 500);
+    } if abs($date1->strftime('%s') - $date2->strftime('%s')) > ($self->{'config'}->{'Net::Amazon::Alexa::Dispatch'}->{'max_token_age'} // 500);
 
     # TODO use something better than the password as a token
-    my $dispatcher_token = $self->{'config'}->{'Amazon::Alexa::Dispatch'}->{'alexa_token'};
-    throw "No token configured in Config->Amazon::Alexa::Dispatch->alexa_token", {
+    my $dispatcher_token = $self->{'config'}->{'Net::Amazon::Alexa::Dispatch'}->{'alexa_token'};
+    throw "No token configured in Config->Net::Amazon::Alexa::Dispatch->alexa_token", {
         cause => 'Missing alexa_token',
         alexa_safe => 1,
     } unless defined $dispatcher_token;

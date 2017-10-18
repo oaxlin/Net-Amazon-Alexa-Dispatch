@@ -465,4 +465,13 @@ sub msg_to_hash {
     };
 }
 
+sub config {
+    my $self = shift;
+    my $config = $self->{'config'}->{ref $self};
+    throw "Missing ".(ref $self)." config", {
+        alexa_safe => 1,
+    } unless $config;
+    return $config;
+}
+
 1;

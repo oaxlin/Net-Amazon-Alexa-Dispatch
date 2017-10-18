@@ -144,6 +144,7 @@ sub run_method {
     my $ret = eval {
         my $method = $json->{'request'}->{'intent'}->{'name'};
         my ($module,$full_method) = $self->_find_module($method);
+        warn "$module->$method\n";
 
         my $obj = eval{ $module->new($self->{'config'}); } or throw "Skill plugin could not be initialized", {
                                                                cause => $@,

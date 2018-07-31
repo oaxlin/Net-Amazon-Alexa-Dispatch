@@ -8,7 +8,6 @@ use URI::Escape;
 use Throw qw{throw};
 
 my $me = 'Net::Amazon::Alexa::Dispatch';
-my $dispatch_type; # currently CGI only
 
 =head1 NAME
 
@@ -81,13 +80,14 @@ sub new {
     my $config = {'Net::Amazon::Alexa::Dispatch'=>{}};
     if ($args->{'configFile'}) {
         local $/;
-        open( my $fh, '<', $args->{'configFile'} );
+        open( my $fh, '<', $args->{'configFile'} )  or die "unable to close: $!";
         my $text = <$fh>;
+        close $fh or die "unable to close: $!";
         my $temp_config = eval $text; ## no critic
         $config = $temp_config if ref $temp_config eq 'HASH' && exists $temp_config->{'Net::Amazon::Alexa::Dispatch'};
     }
     $config = $args if ref $args->{'Net::Amazon::Alexa::Dispatch'} eq 'HASH';
-    push @$dispatch, @{$config->{'Net::Amazon::Alexa::Dispatch'}->{'dispatch'}} if ref $config->{'Net::Amazon::Alexa::Dispatch'}->{'dispatch'} eq 'ARRAY';
+    push @{$dispatch}, @{$config->{'Net::Amazon::Alexa::Dispatch'}->{'dispatch'}} if ref $config->{'Net::Amazon::Alexa::Dispatch'}->{'dispatch'} eq 'ARRAY';
     my $node = {
         configFile => $args->{'configFile'},
         skillName => $args->{'skillName'} // $config->{'Net::Amazon::Alexa::Dispatch'}->{'skillName'} // 'Alexa Skill',
@@ -101,17 +101,21 @@ sub _find_module {
     # loops through all dispatch modules looking for a method match
     my $self = shift;
     my $method = shift;
-    foreach my $module (@{$self->{'dispatch'}}) {
-        eval "require $module" or throw "Skill plugin $module not found", { ## no critic
-                                      cause => $@,
-                                      alexa_safe => 1,
-                                  }; ## no critic
-        my $prefix = eval{ $module->intent_prefix } // '';
-        my $full_method = $prefix.$method;
-        return ($module,$full_method) if $module->can($full_method);
+    if ($method) {
+        foreach my $module (@{$self->{'dispatch'}}) {
+            eval "require $module" or throw "Skill plugin failed to initialize", { ## no critic
+                                          cause => $@,
+                                          intent_module => $module,
+                                          alexa_safe => 1,
+                                      }; ## no critic
+            my $prefix = eval{ $module->intent_prefix } // '';
+            my $full_method = $prefix.$method;
+            return ($module,$full_method) if $module->can($full_method);
+        }
     }
-    throw "Unknown intent $method", {
-        cause => 'Not found in dispatcher path',
+    throw "Unknown intent", {
+        cause => 'Intent not found/configured',
+        intent_method => $method,
         alexa_safe => 1,
     };
 }
@@ -144,7 +148,7 @@ sub run_method {
     my $ret = eval {
         my $method = $json->{'request'}->{'intent'}->{'name'};
         my ($module,$full_method) = $self->_find_module($method);
-        warn "$module->$method\n";
+        warn "$module->$method\n"; # this warn is intentional, it creates a simple access_log type of entry
 
         my $obj = eval{ $module->new($self->{'config'}); } or throw "Skill plugin could not be initialized", {
                                                                cause => $@,
@@ -154,7 +158,7 @@ sub run_method {
     };
     my $e = $@;
     if ($e) {
-        warn $e;
+        throw $e if ref $e eq 'Throw' && $e->{'alexa_safe'};
         $ret = { error => $e };
     }
     return $self->msg_to_hash($ret);
@@ -291,7 +295,7 @@ sub alexa_authenticate_json {
     throw "Please open the Alexa skill from your phone to re link your account, then try again", {
         cause => 'token mismatch',
         alexa_safe => 1,
-    } unless $token eq $dispatcher_token;
+    } unless defined $token && $token eq $dispatcher_token;
     1;
 }
 
@@ -433,7 +437,7 @@ sub msg_to_hash {
         && defined $ret->{'response'}->{'shouldEndSession'};
 
     while (ref $ret eq 'HASH'
-        && scalar keys %$ret == 1
+        && scalar keys %{$ret} == 1
         && exists $ret->{'error'}
         && ((ref $ret->{'error'}) =~ /^(HASH|Throw)$/)
     ) {
